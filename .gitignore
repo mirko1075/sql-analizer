@@ -1,0 +1,6 @@
+backend/db/*.sql
+ai-query-lab/*
+data/*
+backend/db/*
+backend/__pycache__
+backend/core/__pycache__

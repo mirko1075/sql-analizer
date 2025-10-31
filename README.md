@@ -1,2 +1,1 @@
 # sql-analizer
-# sql-analizer
