@@ -11,6 +11,8 @@ from backend.services.fingerprint import (
     is_query_safe_to_explain,
     extract_tables_from_query,
 )
+from backend.services.analyzer import QueryAnalyzer
+from backend.services.ai_stub import AIAnalyzer, get_ai_analyzer
 
 __all__ = [
     "MySQLCollector",
@@ -19,4 +21,7 @@ __all__ = [
     "normalize_query",
     "is_query_safe_to_explain",
     "extract_tables_from_query",
+    "QueryAnalyzer",
+    "AIAnalyzer",
+    "get_ai_analyzer",
 ]
