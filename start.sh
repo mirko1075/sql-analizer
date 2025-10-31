@@ -47,7 +47,7 @@ case "$MODE" in
         # Start lab databases first
         echo "📊 Starting lab databases (MySQL + PostgreSQL)..."
         cd ai-query-lab
-        docker-compose up -d
+        docker compose up -d
         cd ..
 
         # Wait a bit for lab databases to be ready
@@ -56,7 +56,7 @@ case "$MODE" in
 
         # Start main application
         echo "🔧 Starting main application services..."
-        docker-compose up -d
+        docker compose up -d
 
         echo ""
         echo "✅ All services started successfully!"
@@ -69,7 +69,7 @@ case "$MODE" in
         echo "  - PG Lab:    localhost:5433"
         echo ""
         echo "📊 View logs:"
-        echo "  docker-compose logs -f [service-name]"
+        echo "  docker compose logs -f [service-name]"
         echo ""
         echo "🛑 Stop services:"
         echo "  ./start.sh stop"
@@ -91,7 +91,7 @@ case "$MODE" in
         # Start lab databases first
         echo "📊 Starting lab databases (MySQL + PostgreSQL)..."
         cd ai-query-lab
-        docker-compose up -d
+        docker compose up -d
         cd ..
 
         # Wait for lab databases
@@ -100,7 +100,7 @@ case "$MODE" in
 
         # Start main application in production mode
         echo "🔧 Starting main application services (production)..."
-        docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+        docker compose -f docker compose.prod.yml --env-file .env.prod up -d
 
         echo ""
         echo "✅ All services started successfully in PRODUCTION mode!"
@@ -111,13 +111,13 @@ case "$MODE" in
         echo "  - API Docs:  http://localhost:8000/docs"
         echo ""
         echo "🛑 Stop services:"
-        echo "  docker-compose -f docker-compose.prod.yml down"
+        echo "  docker compose -f docker compose.prod.yml down"
         ;;
 
     lab)
         echo "📊 Starting ONLY lab databases..."
         cd ai-query-lab
-        docker-compose up -d
+        docker compose up -d
         cd ..
 
         echo ""
@@ -131,12 +131,12 @@ case "$MODE" in
 
         # Stop main application
         echo "  Stopping main application..."
-        docker-compose down
+        docker compose down
 
         # Stop lab databases
         echo "  Stopping lab databases..."
         cd ai-query-lab
-        docker-compose down
+        docker compose down
         cd ..
 
         echo ""
@@ -150,9 +150,9 @@ case "$MODE" in
         read
 
         # Stop and remove everything
-        docker-compose down -v
+        docker compose down -v
         cd ai-query-lab
-        docker-compose down -v
+        docker compose down -v
         cd ..
 
         # Remove data directories
@@ -165,7 +165,7 @@ case "$MODE" in
 
     logs)
         echo "📋 Showing logs (press Ctrl+C to exit)..."
-        docker-compose logs -f
+        docker compose logs -f
         ;;
 
     *)

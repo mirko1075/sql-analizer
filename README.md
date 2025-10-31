@@ -129,7 +129,7 @@ Production access:
 
 ```bash
 cd ai-query-lab
-docker-compose up -d
+docker compose up -d
 cd ..
 ```
 
@@ -455,7 +455,7 @@ All services include health checks:
 
 ```bash
 # Check all services
-docker-compose ps
+docker compose ps
 
 # Check specific service
 curl http://localhost:8000/health
@@ -465,13 +465,13 @@ curl http://localhost:8000/health
 
 ```bash
 # View all logs
-docker-compose logs -f
+docker compose logs -f
 
 # View specific service
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # View last 100 lines
-docker-compose logs --tail=100 backend
+docker compose logs --tail=100 backend
 ```
 
 #### Metrics
@@ -492,8 +492,8 @@ Access the Statistics page in the UI for:
 netstat -ln | grep -E '3307|5433'
 
 # Remove old containers
-docker-compose down -v
-cd ai-query-lab && docker-compose down -v && cd ..
+docker compose down -v
+cd ai-query-lab && docker compose down -v && cd ..
 
 # Restart
 ./start.sh dev
@@ -516,13 +516,13 @@ psql -h 127.0.0.1 -p 5433 -U postgres
 
 1. Check collector status: `GET /api/v1/collectors/status`
 2. Verify slow query logging is enabled in lab databases
-3. Check collector logs: `docker-compose logs backend`
+3. Check collector logs: `docker compose logs backend`
 4. Manually trigger collection: `POST /api/v1/collectors/mysql/collect`
 
 ### Frontend Not Loading
 
 1. Check if backend is running: `curl http://localhost:8000/health`
-2. Check nginx logs: `docker-compose logs frontend`
+2. Check nginx logs: `docker compose logs frontend`
 3. Verify API URL in frontend environment variables
 4. Check browser console for CORS errors
 
@@ -530,9 +530,9 @@ psql -h 127.0.0.1 -p 5433 -U postgres
 
 ```bash
 # Recreate internal database
-docker-compose down internal-db
+docker compose down internal-db
 docker volume rm sql-analizer_internal-db-data
-docker-compose up -d internal-db
+docker compose up -d internal-db
 
 # Or use clean command
 ./start.sh clean
