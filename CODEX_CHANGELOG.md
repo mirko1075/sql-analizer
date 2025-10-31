@@ -9,3 +9,8 @@
 - Updated `backend/services/ai_stub.py` and related helpers so every AI analysis returns at least three concrete query modifications with SQL snippets.
 - Adjusted prompts and added deterministic fallbacks when the provider omits query rewrites.
 - Guarantees the frontend receives actionable query variants alongside the existing recommendations.
+
+## 2025-10-31 - Heavy MySQL Slow Query Generator
+- Added `ai-query-lab/db/mysql/generate_heavy_slow_queries.sh` to provision 100k synthetic customers, 1M orders, and execute three complex workloads against `mysql-lab`.
+- The script builds digit helper tables, synthesises realistic data, and issues correlated, windowed, and anti-join queries to guarantee slow-log entries.
+- Keeps test automation clean by living separately from `test_slow_queries.sh` while providing a repeatable way to stress MySQL.
