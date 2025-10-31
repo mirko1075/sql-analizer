@@ -14,6 +14,9 @@ from backend.core.logger import get_logger
 from backend.services.mysql_collector import MySQLCollector
 from backend.services.postgres_collector import PostgreSQLCollector
 from backend.services.analyzer import QueryAnalyzer
+from backend.db.session import get_db_context
+from backend.db.models import SlowQueryRaw, AnalysisResult
+from sqlalchemy import func
 
 logger = get_logger(__name__)
 
@@ -161,15 +164,43 @@ class CollectorScheduler:
                     'next_run': job.next_run_time.isoformat() if job.next_run_time else None,
                 })
 
+        # Derive counters and timestamps from the database so manual triggers stay in sync.
+        mysql_total = 0
+        postgres_total = 0
+        total_analyses = 0
+        mysql_last_seen = None
+        postgres_last_seen = None
+        analyzer_last_seen = None
+
+        with get_db_context() as db:
+            mysql_total = db.query(func.count(SlowQueryRaw.id)).filter(
+                SlowQueryRaw.source_db_type == 'mysql'
+            ).scalar() or 0
+
+            postgres_total = db.query(func.count(SlowQueryRaw.id)).filter(
+                SlowQueryRaw.source_db_type == 'postgres'
+            ).scalar() or 0
+
+            mysql_last_seen = db.query(func.max(SlowQueryRaw.captured_at)).filter(
+                SlowQueryRaw.source_db_type == 'mysql'
+            ).scalar()
+
+            postgres_last_seen = db.query(func.max(SlowQueryRaw.captured_at)).filter(
+                SlowQueryRaw.source_db_type == 'postgres'
+            ).scalar()
+
+            analyzer_last_seen = db.query(func.max(AnalysisResult.analyzed_at)).scalar()
+            total_analyses = db.query(func.count(AnalysisResult.id)).scalar() or 0
+
         return {
             'is_running': self.is_running,
             'jobs': jobs,
-            'mysql_last_run': self.last_mysql_run.isoformat() if self.last_mysql_run else None,
-            'postgres_last_run': self.last_postgres_run.isoformat() if self.last_postgres_run else None,
-            'analyzer_last_run': self.last_analyzer_run.isoformat() if self.last_analyzer_run else None,
-            'mysql_total_collected': self.mysql_collected_count,
-            'postgres_total_collected': self.postgres_collected_count,
-            'total_analyzed': self.analyzed_count,
+            'mysql_last_run': (self.last_mysql_run or mysql_last_seen).isoformat() if (self.last_mysql_run or mysql_last_seen) else None,
+            'postgres_last_run': (self.last_postgres_run or postgres_last_seen).isoformat() if (self.last_postgres_run or postgres_last_seen) else None,
+            'analyzer_last_run': (self.last_analyzer_run or analyzer_last_seen).isoformat() if (self.last_analyzer_run or analyzer_last_seen) else None,
+            'mysql_total_collected': max(self.mysql_collected_count, mysql_total),
+            'postgres_total_collected': max(self.postgres_collected_count, postgres_total),
+            'total_analyzed': max(self.analyzed_count, total_analyses),
         }
 
 

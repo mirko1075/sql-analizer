@@ -13,6 +13,8 @@ from backend.services.fingerprint import (
 )
 from backend.services.analyzer import QueryAnalyzer
 from backend.services.ai_stub import AIAnalyzer, get_ai_analyzer
+from backend.services.db_context_collector import DatabaseContextCollector
+from backend.services.ai_analysis import AIAnalysisService, analyze_query_with_ai
 
 __all__ = [
     "MySQLCollector",
@@ -24,4 +26,7 @@ __all__ = [
     "QueryAnalyzer",
     "AIAnalyzer",
     "get_ai_analyzer",
+    "DatabaseContextCollector",
+    "AIAnalysisService",
+    "analyze_query_with_ai",
 ]

@@ -28,11 +28,14 @@ export interface SlowQueryDetail {
   duration_ms: number | string;  // Backend returns as string (Decimal)
   rows_examined: number;
   rows_returned: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   plan_json: any;
   plan_text: string | null;
   captured_at: string;
   status: 'NEW' | 'ANALYZED' | 'ERROR';
   analysis?: AnalysisResult;
+  ai_analysis?: AIAnalysisResult | null;
+  ai_analysis_id?: string | null;
 }
 
 export interface AnalysisResult {
@@ -57,6 +60,33 @@ export interface Suggestion {
   sql?: string;
   estimated_impact?: string;
   rationale?: string;
+}
+
+export interface AIRecommendation {
+  type?: 'INDEX' | 'OPTIMIZATION' | 'BEST_PRACTICE' | 'MONITORING' | 'REVIEW';
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  description?: string;
+  sql?: string | null;
+  estimated_impact?: string | null;
+  rationale?: string | null;
+}
+
+export interface AIAnalysisResult {
+  id: string;
+  slow_query_id: string;
+  provider: string;
+  model: string;
+  summary: string;
+  root_cause: string;
+  recommendations: AIRecommendation[];
+  improvement_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  estimated_speedup?: string;
+  confidence_score?: number | string | null;
+  prompt_metadata?: Record<string, unknown> | null;
+  provider_response?: Record<string, unknown> | null;
+  analyzed_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TableImpact {

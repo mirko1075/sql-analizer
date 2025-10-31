@@ -53,8 +53,7 @@ const Collectors: React.FC = () => {
     try {
       setActionLoading(action);
       await fn();
-      // Wait a bit and reload status
-      setTimeout(loadStatus, 1500);
+      await loadStatus();
     } catch (error) {
       console.error(`Failed to execute ${action}:`, error);
       alert(`Failed to execute ${action}. Check console for details.`);
@@ -118,6 +117,26 @@ const Collectors: React.FC = () => {
                       ? 'Automated collection and analysis is active'
                       : 'Scheduler is not running - use manual triggers'}
                   </p>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-600">
+                    <div className="bg-white/70 rounded-md px-3 py-2 shadow-sm">
+                      <p className="font-semibold text-gray-900">
+                        {collectorStatus.mysql_total_collected.toLocaleString()}
+                      </p>
+                      <p>Total MySQL queries collected</p>
+                    </div>
+                    <div className="bg-white/70 rounded-md px-3 py-2 shadow-sm">
+                      <p className="font-semibold text-gray-900">
+                        {collectorStatus.postgres_total_collected.toLocaleString()}
+                      </p>
+                      <p>Total PostgreSQL queries collected</p>
+                    </div>
+                    <div className="bg-white/70 rounded-md px-3 py-2 shadow-sm">
+                      <p className="font-semibold text-gray-900">
+                        {collectorStatus.total_analyzed.toLocaleString()}
+                      </p>
+                      <p>Queries analyzed</p>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="flex space-x-2">

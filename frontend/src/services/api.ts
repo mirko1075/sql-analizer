@@ -10,6 +10,7 @@ import type {
   AnalyzerStatus,
   HealthStatus,
   PaginatedResponse,
+  AIAnalysisResult,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -116,6 +117,7 @@ export const getUnanalyzedQueries = async (limit: number = 10): Promise<SlowQuer
   return response.data.queries;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getQueryTrends = async (days: number = 7): Promise<any> => {
   const params = new URLSearchParams({
     days: days.toString(),
@@ -165,6 +167,23 @@ export const triggerAnalysis = async (limit: number = 50): Promise<void> => {
 
 export const analyzeSpecificQuery = async (queryId: string): Promise<void> => {
   await api.post(`/api/v1/analyzer/analyze/${queryId}`);
+};
+
+export const analyzeQueryWithAI = async (
+  queryId: string,
+  options: { force?: boolean } = {}
+): Promise<AIAnalysisResult> => {
+  const params = new URLSearchParams();
+  if (options.force) {
+    params.append('force', 'true');
+  }
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/slow-queries/${queryId}/analyze-ai?${queryString}`
+    : `/api/v1/slow-queries/${queryId}/analyze-ai`;
+
+  const response = await api.post(url);
+  return response.data;
 };
 
 export default api;
