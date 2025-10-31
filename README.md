@@ -121,6 +121,20 @@ Production access:
 ./start.sh logs
 ```
 
+## 📚 Documentation
+
+For comprehensive guides, see:
+
+- **[🚀 Environment Setup Guide](ENVIRONMENT_GUIDE.md)** - Complete environment setup and verification
+- **[🧪 Testing Guide](TESTING_GUIDE.md)** - How to run performance tests and interpret results
+- **[📖 Test Catalog](ai-query-lab/tests/README_TESTS.md)** - Complete catalog of all 38 test cases
+
+### Quick Links
+- Run all performance tests: `cd ai-query-lab/tests && ./run_tests.sh all`
+- Run MySQL tests only: `./run_tests.sh mysql`
+- Run specific category: `./run_tests.sh mysql SCAN`
+- Run single test: `./run_tests.sh mysql --single SCAN-001`
+
 ## Installation
 
 ### Manual Installation (Development)
@@ -343,7 +357,40 @@ sql-analizer/
 
 ### Running Tests
 
-#### Backend Tests
+#### Performance Tests (38 Test Cases)
+
+Comprehensive test suite for SQL performance problems:
+
+```bash
+cd ai-query-lab/tests
+
+# Run all tests (MySQL + PostgreSQL)
+./run_tests.sh all
+
+# Run specific database
+./run_tests.sh mysql
+./run_tests.sh postgres
+
+# Run specific categories
+./run_tests.sh mysql SCAN INDEX JOIN
+
+# Run single test
+./run_tests.sh mysql --single SCAN-001
+```
+
+Test categories:
+- **SCAN**: Full table scans (5 tests)
+- **INDEX**: Missing indexes (5 tests)
+- **JOIN**: JOIN problems (5 tests)
+- **SUB**: Subquery issues (5 tests)
+- **AGG**: Aggregation problems (5 tests)
+- **FUNC**: Function on columns (5 tests)
+- **TYPE**: Type conversions (4 tests)
+- **OR**: OR conditions (4 tests)
+
+See [Testing Guide](TESTING_GUIDE.md) for details.
+
+#### Backend Unit Tests
 
 ```bash
 cd backend
