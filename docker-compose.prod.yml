@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  # Internal PostgreSQL database for storing collected queries and analysis results
+  internal-db:
+    image: postgres:15
+    container_name: ai-analyzer-internal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${INTERNAL_DB_USER:-ai_core}
+      POSTGRES_PASSWORD: ${INTERNAL_DB_PASSWORD:-ai_core_secure_password}
+      POSTGRES_DB: ${INTERNAL_DB_NAME:-ai_core}
+    ports:
+      - "${INTERNAL_DB_PORT:-5440}:5432"
+    volumes:
+      - ./backend/db/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql:ro
+      - internal-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INTERNAL_DB_USER:-ai_core}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-analyzer-network
+
+  # Redis for caching and task queue
+  redis:
+    image: redis:7-alpine
+    container_name: ai-analyzer-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-analyzer-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-analyzer-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      # Internal DB connection
+      INTERNAL_DB_HOST: internal-db
+      INTERNAL_DB_PORT: 5432
+      INTERNAL_DB_USER: ${INTERNAL_DB_USER:-ai_core}
+      INTERNAL_DB_PASSWORD: ${INTERNAL_DB_PASSWORD:-ai_core_secure_password}
+      INTERNAL_DB_NAME: ${INTERNAL_DB_NAME:-ai_core}
+
+      # Redis connection
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secure_password}
+
+      # MySQL Lab connection (external)
+      MYSQL_HOST: ${MYSQL_LAB_HOST:-mysql-lab}
+      MYSQL_PORT: ${MYSQL_LAB_PORT:-3306}
+      MYSQL_USER: ${MYSQL_LAB_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_LAB_PASSWORD:-root}
+      MYSQL_DB: ${MYSQL_LAB_DB:-labdb}
+
+      # PostgreSQL Lab connection (external)
+      PG_HOST: ${PG_LAB_HOST:-postgres-lab}
+      PG_PORT: ${PG_LAB_PORT:-5432}
+      PG_USER: ${PG_LAB_USER:-postgres}
+      PG_PASSWORD: ${PG_LAB_PASSWORD:-postgres}
+      PG_DB: ${PG_LAB_DB:-labdb}
+
+      # Application settings
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+      API_TITLE: "AI Query Analyzer API"
+      API_VERSION: "1.0.0"
+    depends_on:
+      internal-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ai-analyzer-network
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+
+  # React Frontend with Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    container_name: ai-analyzer-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks:
+      - ai-analyzer-network
+
+volumes:
+  internal-db-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  ai-analyzer-network:
+    driver: bridge
