@@ -16,7 +16,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.core.config import settings
 from backend.core.logger import get_logger
 from backend.db.session import check_db_connection, init_db
-from backend.api.routes import slow_queries, stats
+from backend.api.routes import slow_queries, stats, collectors
+from backend.services.scheduler import start_scheduler, stop_scheduler
 
 logger = get_logger(__name__)
 
@@ -60,12 +61,29 @@ async def lifespan(app: FastAPI):
     logger.info("✓ Application startup complete")
     logger.info("=" * 60)
 
+    # Start collector scheduler (5 minute interval)
+    try:
+        logger.info("Starting collector scheduler...")
+        start_scheduler(interval_minutes=5)
+        logger.info("✓ Collector scheduler started")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}")
+        logger.warning("Application starting without scheduler")
+
     yield
 
     # Shutdown
     logger.info("=" * 60)
     logger.info("AI Query Analyzer Backend Shutting Down...")
     logger.info("=" * 60)
+
+    # Stop scheduler
+    try:
+        logger.info("Stopping collector scheduler...")
+        stop_scheduler()
+        logger.info("✓ Scheduler stopped")
+    except Exception as e:
+        logger.error(f"Error stopping scheduler: {e}")
 
     # Close database connections
     try:
@@ -248,6 +266,7 @@ async def root():
 # Include routers
 app.include_router(slow_queries.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
+app.include_router(collectors.router, prefix="/api/v1")
 
 # Log registered routes on startup
 @app.on_event("startup")

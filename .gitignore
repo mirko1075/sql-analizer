@@ -5,3 +5,5 @@ data/*
 backend/db/*
 backend/__pycache__
 backend/core/__pycache__
+backend/services/__pycache__
+venv
