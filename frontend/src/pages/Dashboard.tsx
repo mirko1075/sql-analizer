@@ -138,7 +138,7 @@ const Dashboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Queries</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.total_queries}</p>
+                    <p className="text-3xl font-bold text-gray-900">{stats.total_slow_queries}</p>
                   </div>
                   <Database className="text-primary-600" size={32} />
                 </div>
@@ -149,7 +149,7 @@ const Dashboard: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-600">Analyzed</p>
                     <p className="text-3xl font-bold text-green-600">
-                      {stats.analysis_status.analyzed}
+                      {stats.total_analyzed}
                     </p>
                   </div>
                   <CheckCircle className="text-green-600" size={32} />
@@ -161,7 +161,7 @@ const Dashboard: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-600">Pending Analysis</p>
                     <p className="text-3xl font-bold text-yellow-600">
-                      {stats.analysis_status.pending}
+                      {stats.total_pending}
                     </p>
                   </div>
                   <Clock className="text-yellow-600" size={32} />
@@ -171,9 +171,9 @@ const Dashboard: React.FC = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Last 24h</p>
+                    <p className="text-sm text-gray-600">Databases Monitored</p>
                     <p className="text-3xl font-bold text-primary-600">
-                      {stats.recent_activity.last_24h}
+                      {stats.databases_monitored}
                     </p>
                   </div>
                   <TrendingUp className="text-primary-600" size={32} />
@@ -192,36 +192,36 @@ const Dashboard: React.FC = () => {
                 Improvement Potential
               </h2>
               <div className="space-y-3">
-                {Object.entries(stats.improvement_distribution).map(([level, count]) => (
-                  <div key={level} className="flex items-center justify-between">
+                {stats.improvement_summary.map((item) => (
+                  <div key={item.improvement_level} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <span className={`badge ${getImprovementLevelColor(level)}`}>{level}</span>
+                      <span className={`badge ${getImprovementLevelColor(item.improvement_level)}`}>{item.improvement_level}</span>
                       <span className="text-sm text-gray-600">queries</span>
                     </div>
-                    <span className="font-semibold text-gray-900">{count}</span>
+                    <span className="font-semibold text-gray-900">{item.count}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Database Distribution */}
-          {stats && (
+          {/* Top Tables */}
+          {stats && stats.top_tables.length > 0 && (
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <Database className="mr-2 text-primary-600" size={24} />
-                Databases
+                Top Impacted Tables
               </h2>
               <div className="space-y-3">
-                {Object.entries(stats.databases).map(([dbType, data]) => (
-                  <div key={dbType} className="flex items-center justify-between">
+                {stats.top_tables.map((table) => (
+                  <div key={`${table.source_db_type}-${table.table_name}`} className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900">{dbType.toUpperCase()}</p>
+                      <p className="font-medium text-gray-900">{table.table_name}</p>
                       <p className="text-sm text-gray-600">
-                        Avg: {data.avg_duration_ms.toFixed(2)}ms
+                        {table.source_db_type.toUpperCase()} - Avg: {table.avg_duration_ms?.toFixed(2) || '0.00'}ms
                       </p>
                     </div>
-                    <span className="badge badge-info">{data.count} queries</span>
+                    <span className="badge badge-info">{table.query_count} queries</span>
                   </div>
                 ))}
               </div>

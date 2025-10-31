@@ -179,13 +179,13 @@ const SlowQueries: React.FC = () => {
                         <Clock size={14} className="inline mr-1" />
                         Last seen: {new Date(query.last_seen).toLocaleString()}
                       </span>
-                      {query.has_analysis && query.improvement_level && (
+                      {query.has_analysis && query.max_improvement_level && (
                         <span
                           className={`badge ${getImprovementLevelColor(
-                            query.improvement_level
+                            query.max_improvement_level
                           )}`}
                         >
-                          {query.improvement_level} Impact
+                          {query.max_improvement_level} Impact
                         </span>
                       )}
                       {!query.has_analysis && (

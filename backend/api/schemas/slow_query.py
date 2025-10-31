@@ -26,6 +26,7 @@ class SlowQueryBase(BaseModel):
 
 class SlowQuerySummary(BaseModel):
     """Summary of slow queries grouped by fingerprint."""
+    id: str = Field(..., description="Representative query ID (most recent execution)")
     fingerprint: str = Field(..., description="Query fingerprint")
     source_db_type: str
     source_db_host: str

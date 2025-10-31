@@ -258,9 +258,27 @@ async def get_global_stats(
             recent_trend=recent_trend
         )
 
+
     except Exception as e:
         logger.error(f"Error getting global stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# New endpoint: GET /api/v1/stats
+@router.get(
+    "",
+    response_model=GlobalStatsResponse,
+    summary="Get overall statistics",
+    description="Get overall statistics across all monitored databases (frontend aggregate endpoint)"
+)
+async def get_stats(
+    db: Session = Depends(get_db)
+):
+    """
+    Aggregate statistics endpoint for frontend compatibility.
+    Returns same data as /global for now.
+    """
+    return await get_global_stats(db)
 
 
 @router.get(

@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
-  TrendingUp,
   Database,
   Clock,
   AlertTriangle,
@@ -82,7 +81,7 @@ const Statistics: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Queries</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.total_queries}</p>
+                    <p className="text-3xl font-bold text-gray-900">{stats.total_slow_queries}</p>
                   </div>
                   <Database className="text-primary-600" size={32} />
                 </div>
@@ -93,7 +92,7 @@ const Statistics: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-600">Analyzed</p>
                     <p className="text-3xl font-bold text-green-600">
-                      {stats.analysis_status.analyzed}
+                      {stats.total_analyzed}
                     </p>
                   </div>
                   <CheckCircle className="text-green-600" size={32} />
@@ -105,7 +104,7 @@ const Statistics: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-600">Pending</p>
                     <p className="text-3xl font-bold text-yellow-600">
-                      {stats.analysis_status.pending}
+                      {stats.total_pending}
                     </p>
                   </div>
                   <Clock className="text-yellow-600" size={32} />
@@ -115,71 +114,13 @@ const Statistics: React.FC = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Last 24h</p>
+                    <p className="text-sm text-gray-600">Databases Monitored</p>
                     <p className="text-3xl font-bold text-primary-600">
-                      {stats.recent_activity.last_24h}
+                      {stats.databases_monitored}
                     </p>
                   </div>
                   <Activity className="text-primary-600" size={32} />
                 </div>
-              </div>
-            </div>
-
-            {/* Activity Timeline */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <TrendingUp className="mr-2 text-primary-600" size={24} />
-                Recent Activity
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <p className="text-4xl font-bold text-primary-600">
-                    {stats.recent_activity.last_24h}
-                  </p>
-                  <p className="text-sm text-gray-600 mt-2">Last 24 Hours</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-4xl font-bold text-primary-600">
-                    {stats.recent_activity.last_7d}
-                  </p>
-                  <p className="text-sm text-gray-600 mt-2">Last 7 Days</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-4xl font-bold text-primary-600">
-                    {stats.recent_activity.last_30d}
-                  </p>
-                  <p className="text-sm text-gray-600 mt-2">Last 30 Days</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Database Distribution */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <Database className="mr-2 text-primary-600" size={24} />
-                Database Distribution
-              </h2>
-              <div className="space-y-4">
-                {Object.entries(stats.databases).map(([dbType, data]) => (
-                  <div key={dbType}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-900">
-                        {dbType.toUpperCase()}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {data.count} queries • Avg: {data.avg_duration_ms.toFixed(2)}ms
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-primary-600 h-2 rounded-full"
-                        style={{
-                          width: `${(data.count / stats.total_queries) * 100}%`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
 
@@ -190,7 +131,7 @@ const Statistics: React.FC = () => {
                 Improvement Potential Distribution
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(stats.improvement_distribution).map(([level, count]) => {
+                {stats.improvement_summary.map((item) => {
                   const colors: Record<string, string> = {
                     CRITICAL: 'bg-red-500',
                     HIGH: 'bg-orange-500',
@@ -199,13 +140,13 @@ const Statistics: React.FC = () => {
                   };
 
                   return (
-                    <div key={level} className="text-center">
+                    <div key={item.improvement_level} className="text-center">
                       <div
-                        className={`${colors[level] || 'bg-gray-500'} text-white rounded-lg p-4 mb-2`}
+                        className={`${colors[item.improvement_level] || 'bg-gray-500'} text-white rounded-lg p-4 mb-2`}
                       >
-                        <p className="text-3xl font-bold">{count}</p>
+                        <p className="text-3xl font-bold">{item.count}</p>
                       </div>
-                      <p className="text-sm text-gray-600">{level}</p>
+                      <p className="text-sm text-gray-600">{item.improvement_level}</p>
                     </div>
                   );
                 })}

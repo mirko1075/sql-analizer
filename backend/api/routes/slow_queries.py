@@ -49,6 +49,9 @@ async def list_slow_queries(
     - Analysis status
     """
     try:
+        # Subquery to get the most recent query ID for each fingerprint group
+        from sqlalchemy import lateral
+
         # Build base query using the query_performance_summary view
         query = db.query(
             SlowQueryRaw.fingerprint,
@@ -94,8 +97,18 @@ async def list_slow_queries(
         items = query.order_by(desc('avg_duration_ms')).offset(offset).limit(page_size).all()
 
         # Convert to response model
-        summaries = [
-            SlowQuerySummary(
+        # For each grouped result, get the most recent query ID
+        summaries = []
+        for item in items:
+            # Get the most recent query ID for this fingerprint group
+            representative_query = db.query(SlowQueryRaw.id).filter(
+                SlowQueryRaw.fingerprint == item.fingerprint,
+                SlowQueryRaw.source_db_type == item.source_db_type,
+                SlowQueryRaw.source_db_host == item.source_db_host
+            ).order_by(desc(SlowQueryRaw.captured_at)).first()
+
+            summaries.append(SlowQuerySummary(
+                id=str(representative_query.id) if representative_query else "",
                 fingerprint=item.fingerprint,
                 source_db_type=item.source_db_type,
                 source_db_host=item.source_db_host,
@@ -107,9 +120,7 @@ async def list_slow_queries(
                 last_seen=item.last_seen,
                 has_analysis=item.has_analysis,
                 max_improvement_level=item.max_improvement_level
-            )
-            for item in items
-        ]
+            ))
 
         total_pages = (total + page_size - 1) // page_size
 

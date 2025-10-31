@@ -92,7 +92,7 @@ services:
     container_name: ai-analyzer-frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "80:80"
     environment:
       VITE_API_URL: http://localhost:8000
     depends_on:

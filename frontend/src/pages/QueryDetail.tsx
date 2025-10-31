@@ -132,7 +132,7 @@ const QueryDetail: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-md p-4">
             <p className="text-sm text-gray-600">Duration</p>
-            <p className="text-2xl font-bold text-gray-900">{query.duration_ms.toFixed(2)}ms</p>
+            <p className="text-2xl font-bold text-gray-900">{parseFloat(String(query.duration_ms)).toFixed(2)}ms</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-4">
             <p className="text-sm text-gray-600">Rows Examined</p>
@@ -209,7 +209,7 @@ const QueryDetail: React.FC = () => {
                       Estimated Speedup: <strong>{query.analysis.estimated_speedup}</strong>
                     </span>
                     <span className="text-gray-600">
-                      Confidence: <strong>{(query.analysis.confidence_score * 100).toFixed(0)}%</strong>
+                      Confidence: <strong>{(parseFloat(String(query.analysis.confidence_score)) * 100).toFixed(0)}%</strong>
                     </span>
                     <span className="text-gray-600">
                       Method: <strong>{query.analysis.analysis_method}</strong>

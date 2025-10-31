@@ -3,20 +3,18 @@
  */
 
 export interface SlowQuery {
-  id: string;
+  id: string;  // Representative query ID (most recent execution)
   fingerprint: string;
   execution_count: number;
   avg_duration_ms: number;
   p95_duration_ms: number;
-  p99_duration_ms: number;
   max_duration_ms: number;
   min_duration_ms: number;
   source_db_type: string;
   source_db_host: string;
-  first_seen: string;
   last_seen: string;
   has_analysis: boolean;
-  improvement_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  max_improvement_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
 
 export interface SlowQueryDetail {
@@ -27,7 +25,7 @@ export interface SlowQueryDetail {
   fingerprint: string;
   full_sql: string;
   sql_hash: string;
-  duration_ms: number;
+  duration_ms: number | string;  // Backend returns as string (Decimal)
   rows_examined: number;
   rows_returned: number;
   plan_json: any;
@@ -47,7 +45,7 @@ export interface AnalysisResult {
   estimated_speedup: string;
   analyzer_version: string;
   analysis_method: 'rule_based' | 'ai_assisted' | 'hybrid';
-  confidence_score: number;
+  confidence_score: number | string;  // Backend returns as string (Decimal)
   analyzed_at: string;
   created_at: string;
 }
@@ -61,27 +59,36 @@ export interface Suggestion {
   rationale?: string;
 }
 
+export interface TableImpact {
+  source_db_type: string;
+  source_db_host: string;
+  table_name: string;
+  query_count: number;
+  avg_duration_ms: number;
+  distinct_queries: number;
+}
+
+export interface ImprovementSummary {
+  improvement_level: string;
+  count: number;
+  avg_potential_speedup?: string | null;
+}
+
+export interface QueryTrend {
+  date: string;
+  query_count: number;
+  avg_duration_ms: number;
+  max_duration_ms: number;
+}
+
 export interface StatsResponse {
-  total_queries: number;
-  databases: {
-    [key: string]: {
-      count: number;
-      avg_duration_ms: number;
-    };
-  };
-  improvement_distribution: {
-    [key: string]: number;
-  };
-  analysis_status: {
-    analyzed: number;
-    pending: number;
-    error: number;
-  };
-  recent_activity: {
-    last_24h: number;
-    last_7d: number;
-    last_30d: number;
-  };
+  total_slow_queries: number;
+  total_analyzed: number;
+  total_pending: number;
+  databases_monitored: number;
+  top_tables: TableImpact[];
+  improvement_summary: ImprovementSummary[];
+  recent_trend: QueryTrend[];
 }
 
 export interface CollectorStatus {
