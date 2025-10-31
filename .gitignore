@@ -1,3 +1,4 @@
+.env
 backend/db/*.sql
 ai-query-lab/*
 data/*
