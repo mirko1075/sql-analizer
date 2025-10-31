@@ -14,6 +14,29 @@ import {
 import { getSlowQueryDetail, analyzeSpecificQuery } from '../services/api';
 import type { SlowQueryDetail } from '../types';
 
+/**
+ * Decode hex-encoded SQL string.
+ * Handles strings starting with \x (hex encoded).
+ */
+const decodeHexString = (str: string): string => {
+  if (!str || typeof str !== 'string') return str;
+
+  // Check if string is hex-encoded (starts with \x)
+  if (str.startsWith('\\x')) {
+    try {
+      // Remove \x prefix and convert hex to string
+      const hex = str.slice(2);
+      const bytes = new Uint8Array(hex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch (error) {
+      console.error('Failed to decode hex string:', error);
+      return str; // Return original if decoding fails
+    }
+  }
+
+  return str;
+};
+
 const QueryDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -156,7 +179,7 @@ const QueryDetail: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">SQL Query</h2>
           <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
-            <pre className="text-sm font-mono whitespace-pre-wrap">{query.full_sql}</pre>
+            <pre className="text-sm font-mono whitespace-pre-wrap">{decodeHexString(query.full_sql)}</pre>
           </div>
           <div className="mt-4 flex items-center justify-between">
             <div className="text-sm text-gray-600">

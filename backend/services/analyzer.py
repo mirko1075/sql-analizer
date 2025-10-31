@@ -5,6 +5,7 @@ Analyzes slow queries using rule-based patterns and AI assistance
 to generate optimization suggestions.
 """
 import json
+import binascii
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
@@ -16,6 +17,33 @@ from backend.db.models import SlowQueryRaw, AnalysisResult
 from backend.services.fingerprint import extract_tables_from_query
 
 logger = get_logger(__name__)
+
+
+def decode_hex_sql(sql: str) -> str:
+    """
+    Decode hex-encoded SQL string if needed.
+
+    Args:
+        sql: SQL string (may be hex-encoded with \\x prefix)
+
+    Returns:
+        Decoded SQL string
+    """
+    if not sql or not isinstance(sql, str):
+        return sql
+
+    # Check if string is hex-encoded (starts with \x)
+    if sql.startswith('\\x'):
+        try:
+            # Remove \x prefix and decode hex
+            hex_string = sql[2:]
+            decoded_bytes = binascii.unhexlify(hex_string)
+            return decoded_bytes.decode('utf-8')
+        except Exception as e:
+            logger.warning(f"Failed to decode hex SQL: {e}")
+            return sql  # Return original if decoding fails
+
+    return sql
 
 
 class QueryAnalyzer:
@@ -103,6 +131,9 @@ class QueryAnalyzer:
         Returns:
             Dictionary with analysis results
         """
+        # Decode hex-encoded SQL if needed
+        decoded_sql = decode_hex_sql(query.full_sql)
+
         # Initialize analysis result
         result = {
             'problem': '',
@@ -116,7 +147,7 @@ class QueryAnalyzer:
         }
 
         # Extract tables
-        tables = extract_tables_from_query(query.full_sql)
+        tables = extract_tables_from_query(decoded_sql)
         result['metadata']['tables'] = tables
 
         # Analyze EXPLAIN plan if available
@@ -129,6 +160,25 @@ class QueryAnalyzer:
         else:
             # No plan available, use heuristics
             result.update(self._analyze_heuristics(query))
+
+        # Try AI-enhanced analysis if enabled
+        if settings.ai_provider != 'stub':
+            try:
+                from backend.services.ai_stub import get_ai_analyzer
+                ai_analyzer = get_ai_analyzer()
+
+                result = ai_analyzer.enhance_analysis(
+                    rule_based_analysis=result,
+                    sql=decoded_sql,
+                    explain_plan=query.plan_json,
+                    db_type=query.source_db_type,
+                    duration_ms=float(query.duration_ms),
+                    rows_examined=query.rows_examined,
+                    rows_returned=query.rows_returned
+                )
+                logger.info(f"Enhanced analysis with AI ({settings.ai_provider})")
+            except Exception as e:
+                logger.warning(f"AI analysis failed, using rule-based only: {e}")
 
         return result
 
@@ -304,8 +354,10 @@ class QueryAnalyzer:
         result = self._default_analysis()
 
         # Check rows examined vs returned ratio
-        if query.rows_examined and query.rows_returned:
-            ratio = query.rows_examined / max(query.rows_returned, 1)
+        # Handle case where rows_returned can be 0 (INSERT, UPDATE, DELETE)
+        if query.rows_examined is not None and query.rows_examined > 0:
+            rows_returned = query.rows_returned if query.rows_returned is not None else 1
+            ratio = query.rows_examined / max(rows_returned, 1)
 
             if ratio > 100:
                 result['problem'] = 'Inefficient query: examining too many rows'
