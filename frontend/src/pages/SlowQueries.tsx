@@ -59,6 +59,19 @@ const SlowQueries: React.FC = () => {
     }
   };
 
+  const getEfficiencyRatioColor = (ratio?: number) => {
+    if (!ratio) return 'bg-gray-100 text-gray-600';
+    if (ratio > 100) return 'bg-red-100 text-red-800';
+    if (ratio > 10) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
+  };
+
+  const formatEfficiencyRatio = (ratio?: number) => {
+    if (!ratio) return 'N/A';
+    if (ratio < 10) return ratio.toFixed(1);
+    return Math.round(ratio).toString();
+  };
+
   if (loading && !queries) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -145,7 +158,7 @@ const SlowQueries: React.FC = () => {
                   </div>
 
                   {/* Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                     <div>
                       <p className="text-xs text-gray-500">Avg Duration</p>
                       <p className="text-lg font-semibold text-gray-900">
@@ -165,6 +178,12 @@ const SlowQueries: React.FC = () => {
                       </p>
                     </div>
                     <div>
+                      <p className="text-xs text-gray-500">Efficiency Ratio</p>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-sm font-semibold ${getEfficiencyRatioColor(query.avg_efficiency_ratio)}`}>
+                        {formatEfficiencyRatio(query.avg_efficiency_ratio)}:1
+                      </span>
+                    </div>
+                    <div>
                       <p className="text-xs text-gray-500">Database</p>
                       <p className="text-lg font-semibold text-gray-900 uppercase">
                         {query.source_db_type}
@@ -174,10 +193,14 @@ const SlowQueries: React.FC = () => {
 
                   {/* Footer */}
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4 flex-wrap gap-y-2">
                       <span className="text-xs text-gray-500">
                         <Clock size={14} className="inline mr-1" />
-                        Last seen: {new Date(query.last_seen).toLocaleString()}
+                        First: {new Date(query.first_seen).toLocaleDateString()}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        <Clock size={14} className="inline mr-1" />
+                        Last: {new Date(query.last_seen).toLocaleString()}
                       </span>
                       {query.has_analysis && query.max_improvement_level && (
                         <span

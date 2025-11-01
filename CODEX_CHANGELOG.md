@@ -14,3 +14,4 @@
 - Added `ai-query-lab/db/mysql/generate_heavy_slow_queries.sh` to provision 100k synthetic customers, 1M orders, and execute three complex workloads against `mysql-lab`.
 - The script builds digit helper tables, synthesises realistic data, and issues correlated, windowed, and anti-join queries to guarantee slow-log entries.
 - Keeps test automation clean by living separately from `test_slow_queries.sh` while providing a repeatable way to stress MySQL.
+- Refined the generator to suppress CLI password warnings and handle existing row counts reliably so reruns skip expensive loads gracefully.

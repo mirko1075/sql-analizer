@@ -64,7 +64,12 @@ async def list_slow_queries(
             func.min(SlowQueryRaw.duration_ms).label('min_duration_ms'),
             func.max(SlowQueryRaw.duration_ms).label('max_duration_ms'),
             func.percentile_cont(0.95).within_group(SlowQueryRaw.duration_ms).label('p95_duration_ms'),
+            func.min(SlowQueryRaw.captured_at).label('first_seen'),
             func.max(SlowQueryRaw.captured_at).label('last_seen'),
+            func.avg(
+                func.nullif(SlowQueryRaw.rows_examined, 0) /
+                func.greatest(func.nullif(SlowQueryRaw.rows_returned, 0), 1)
+            ).label('avg_efficiency_ratio'),
             func.bool_or(SlowQueryRaw.status == 'ANALYZED').label('has_analysis'),
             func.max(AnalysisResult.improvement_level).label('max_improvement_level')
         ).outerjoin(
@@ -119,7 +124,9 @@ async def list_slow_queries(
                 min_duration_ms=float(item.min_duration_ms),
                 max_duration_ms=float(item.max_duration_ms),
                 p95_duration_ms=float(item.p95_duration_ms) if item.p95_duration_ms else None,
+                first_seen=item.first_seen,
                 last_seen=item.last_seen,
+                avg_efficiency_ratio=float(item.avg_efficiency_ratio) if item.avg_efficiency_ratio else None,
                 has_analysis=item.has_analysis,
                 max_improvement_level=item.max_improvement_level
             ))

@@ -12,7 +12,9 @@ export interface SlowQuery {
   min_duration_ms: number;
   source_db_type: string;
   source_db_host: string;
+  first_seen: string;
   last_seen: string;
+  avg_efficiency_ratio?: number;
   has_analysis: boolean;
   max_improvement_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }

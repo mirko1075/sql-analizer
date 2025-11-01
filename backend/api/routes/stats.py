@@ -319,3 +319,122 @@ async def list_monitored_databases(
     except Exception as e:
         logger.error(f"Error listing databases: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/top-slow-queries",
+    summary="Get top slowest queries",
+    description="Get the slowest query patterns by average duration"
+)
+async def get_top_slow_queries(
+    limit: int = Query(10, ge=1, le=50, description="Number of queries to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the slowest query patterns by average duration.
+    Returns aggregated data grouped by fingerprint.
+    """
+    try:
+        queries = db.query(
+            SlowQueryRaw.fingerprint,
+            SlowQueryRaw.source_db_type,
+            SlowQueryRaw.source_db_host,
+            func.count(SlowQueryRaw.id).label('execution_count'),
+            func.avg(SlowQueryRaw.duration_ms).label('avg_duration_ms'),
+            func.min(SlowQueryRaw.captured_at).label('first_seen'),
+            func.max(SlowQueryRaw.captured_at).label('last_seen')
+        ).group_by(
+            SlowQueryRaw.fingerprint,
+            SlowQueryRaw.source_db_type,
+            SlowQueryRaw.source_db_host
+        ).order_by(
+            desc('avg_duration_ms')
+        ).limit(limit).all()
+
+        # Get representative ID and status for each fingerprint (most recent)
+        result = []
+        for query in queries:
+            representative = db.query(SlowQueryRaw.id, SlowQueryRaw.status).filter(
+                SlowQueryRaw.fingerprint == query.fingerprint,
+                SlowQueryRaw.source_db_type == query.source_db_type,
+                SlowQueryRaw.source_db_host == query.source_db_host
+            ).order_by(desc(SlowQueryRaw.captured_at)).first()
+
+            result.append({
+                "id": str(representative[0]) if representative else None,
+                "fingerprint": query.fingerprint,
+                "source_db_type": query.source_db_type,
+                "source_db_host": query.source_db_host,
+                "execution_count": query.execution_count,
+                "avg_duration_ms": float(query.avg_duration_ms),
+                "first_seen": query.first_seen.isoformat() if query.first_seen else None,
+                "last_seen": query.last_seen.isoformat() if query.last_seen else None,
+                "status": representative[1] if representative else "UNKNOWN"
+            })
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting top slow queries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/unanalyzed-queries",
+    summary="Get unanalyzed queries",
+    description="Get queries that haven't been analyzed yet"
+)
+async def get_unanalyzed_queries(
+    limit: int = Query(10, ge=1, le=50, description="Number of queries to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get queries that haven't been analyzed yet (status = NEW).
+    Returns aggregated data grouped by fingerprint.
+    """
+    try:
+        queries = db.query(
+            SlowQueryRaw.fingerprint,
+            SlowQueryRaw.source_db_type,
+            SlowQueryRaw.source_db_host,
+            func.count(SlowQueryRaw.id).label('execution_count'),
+            func.avg(SlowQueryRaw.duration_ms).label('avg_duration_ms'),
+            func.min(SlowQueryRaw.captured_at).label('first_seen'),
+            func.max(SlowQueryRaw.captured_at).label('last_seen')
+        ).filter(
+            SlowQueryRaw.status == 'NEW'
+        ).group_by(
+            SlowQueryRaw.fingerprint,
+            SlowQueryRaw.source_db_type,
+            SlowQueryRaw.source_db_host
+        ).order_by(
+            desc('avg_duration_ms')
+        ).limit(limit).all()
+
+        # Get representative ID for each fingerprint (most recent)
+        result = []
+        for query in queries:
+            representative = db.query(SlowQueryRaw.id).filter(
+                SlowQueryRaw.fingerprint == query.fingerprint,
+                SlowQueryRaw.source_db_type == query.source_db_type,
+                SlowQueryRaw.source_db_host == query.source_db_host,
+                SlowQueryRaw.status == 'NEW'
+            ).order_by(desc(SlowQueryRaw.captured_at)).first()
+
+            result.append({
+                "id": str(representative[0]) if representative else None,
+                "fingerprint": query.fingerprint,
+                "source_db_type": query.source_db_type,
+                "source_db_host": query.source_db_host,
+                "execution_count": query.execution_count,
+                "avg_duration_ms": float(query.avg_duration_ms),
+                "first_seen": query.first_seen.isoformat() if query.first_seen else None,
+                "last_seen": query.last_seen.isoformat() if query.last_seen else None,
+                "status": "NEW"
+            })
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting unanalyzed queries: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
