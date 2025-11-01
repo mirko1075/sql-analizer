@@ -24,6 +24,11 @@ aiohttp==3.9.1
 python-dotenv==1.0.0
 python-multipart==0.0.6
 
+# Authentication and Security
+cryptography==42.0.5
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
 # AI/LLM Integration
 openai==1.54.3
 

@@ -17,8 +17,9 @@ from backend.api.schemas.statistics import (
     AIInsightsResponse,
     AIInsightQuery,
 )
-from backend.db.models import QueryMetricsDaily, QueryFingerprintMetrics
+from backend.db.models import QueryMetricsDaily, QueryFingerprintMetrics, User, Team
 from backend.db.session import get_db
+from backend.core.dependencies import get_current_active_user, get_current_team
 
 router = APIRouter(prefix="/statistics", tags=["Statistics"])
 
@@ -28,6 +29,8 @@ def get_performance_trends(
     days: int = Query(30, ge=1, le=365, description="Number of days to retrieve"),
     source_db_type: Optional[str] = Query(None, description="Filter by database type"),
     source_db_host: Optional[str] = Query(None, description="Filter by database host"),
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
     db: Session = Depends(get_db),
 ):
     """
@@ -39,9 +42,10 @@ def get_performance_trends(
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
 
-    # Build query
+    # Build query with team filtering
     query = db.query(QueryMetricsDaily).filter(
-        QueryMetricsDaily.metric_date >= start_date
+        QueryMetricsDaily.metric_date >= start_date,
+        QueryMetricsDaily.team_id == current_team.id
     )
 
     if source_db_type:
@@ -84,6 +88,8 @@ def get_query_distribution(
     limit: int = Query(10, ge=1, le=50, description="Number of top queries to return"),
     source_db_type: Optional[str] = Query(None, description="Filter by database type"),
     source_db_host: Optional[str] = Query(None, description="Filter by database host"),
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
     db: Session = Depends(get_db),
 ):
     """
@@ -91,8 +97,10 @@ def get_query_distribution(
 
     Returns top queries by various metrics and efficiency histogram.
     """
-    # Base query
-    base_query = db.query(QueryFingerprintMetrics)
+    # Base query with team filtering
+    base_query = db.query(QueryFingerprintMetrics).filter(
+        QueryFingerprintMetrics.team_id == current_team.id
+    )
 
     if source_db_type:
         base_query = base_query.filter(QueryFingerprintMetrics.source_db_type == source_db_type)
@@ -118,7 +126,8 @@ def get_query_distribution(
 
     # Efficiency histogram
     all_ratios = db.query(QueryFingerprintMetrics.avg_efficiency_ratio).filter(
-        QueryFingerprintMetrics.avg_efficiency_ratio.isnot(None)
+        QueryFingerprintMetrics.avg_efficiency_ratio.isnot(None),
+        QueryFingerprintMetrics.team_id == current_team.id
     )
     if source_db_type:
         all_ratios = all_ratios.filter(QueryFingerprintMetrics.source_db_type == source_db_type)
@@ -160,6 +169,8 @@ def get_ai_insights(
     limit: int = Query(10, ge=1, le=50, description="Number of queries to return per category"),
     source_db_type: Optional[str] = Query(None, description="Filter by database type"),
     source_db_host: Optional[str] = Query(None, description="Filter by database host"),
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
     db: Session = Depends(get_db),
 ):
     """
@@ -167,9 +178,10 @@ def get_ai_insights(
 
     Returns high-priority queries and AI analysis statistics.
     """
-    # Base query for queries with AI analysis
+    # Base query for queries with AI analysis and team filtering
     base_query = db.query(QueryFingerprintMetrics).filter(
-        QueryFingerprintMetrics.has_analysis == 1
+        QueryFingerprintMetrics.has_analysis == 1,
+        QueryFingerprintMetrics.team_id == current_team.id
     )
 
     if source_db_type:
