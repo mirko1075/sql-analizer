@@ -206,6 +206,8 @@ class AIAnalyzer:
                 - NEVER propose random, fabricated, or semantically different SQL.
                 - NEVER generate fake SELECTs or example data.
                 - The returned SQL must be executable on the given DB type without modification.
+                - CRITICAL: SQL strings must be on ONE LINE. DO NOT use string concatenation ("+") or line breaks in SQL values.
+                - CRITICAL: Return ONLY valid JSON. Do not use string concatenation operators or multiline strings.
                 """
 
             user_prompt = f"""Analyze the following slow query and return RAW JSON that follows the schema and requirements above. Do not add code fences or prose outside the JSON object.\n\nDATABASE: {db_type}\nDURATION: {duration_ms} ms\nROWS EXAMINED: {rows_examined_str}\nROWS RETURNED: {rows_returned_str}\nEFFICIENCY RATIO: {ratio}\n\nDATABASE CONTEXT:\n{context_blob}\n\nSQL QUERY:\n{sql}\n\nEXECUTION PLAN:\n{explain_plan_blob}\n"""

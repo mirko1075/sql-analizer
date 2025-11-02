@@ -214,7 +214,7 @@ const Collectors: React.FC = () => {
                 <span className="text-gray-600">Last Run:</span>
                 <span className="font-semibold">
                   {collectorStatus?.mysql_last_run
-                    ? new Date(collectorStatus.mysql_last_run).toLocaleTimeString()
+                    ? new Date(collectorStatus.mysql_last_run).toLocaleString()
                     : 'Never'}
                 </span>
               </div>
@@ -252,7 +252,7 @@ const Collectors: React.FC = () => {
                 <span className="text-gray-600">Last Run:</span>
                 <span className="font-semibold">
                   {collectorStatus?.postgres_last_run
-                    ? new Date(collectorStatus.postgres_last_run).toLocaleTimeString()
+                    ? new Date(collectorStatus.postgres_last_run).toLocaleString()
                     : 'Never'}
                 </span>
               </div>
@@ -290,7 +290,7 @@ const Collectors: React.FC = () => {
                 <span className="text-gray-600">Last Run:</span>
                 <span className="font-semibold">
                   {collectorStatus?.analyzer_last_run
-                    ? new Date(collectorStatus.analyzer_last_run).toLocaleTimeString()
+                    ? new Date(collectorStatus.analyzer_last_run).toLocaleString()
                     : 'Never'}
                 </span>
               </div>

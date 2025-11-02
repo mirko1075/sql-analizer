@@ -35,7 +35,9 @@ class SlowQuerySummary(BaseModel):
     min_duration_ms: float = Field(..., description="Minimum execution time")
     max_duration_ms: float = Field(..., description="Maximum execution time")
     p95_duration_ms: Optional[float] = Field(None, description="95th percentile execution time")
+    first_seen: datetime = Field(..., description="First time this query pattern was seen")
     last_seen: datetime = Field(..., description="Last execution timestamp")
+    avg_efficiency_ratio: Optional[float] = Field(None, description="Average rows examined / rows returned ratio")
     has_analysis: bool = Field(..., description="Whether this query has been analyzed")
     max_improvement_level: Optional[str] = Field(None, description="Highest improvement level: LOW, MEDIUM, HIGH, CRITICAL")
 

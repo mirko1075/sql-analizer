@@ -6,10 +6,35 @@ Loads and validates configuration from environment variables.
 import os
 from typing import Optional, Dict, Any
 from dataclasses import dataclass, field
+from cryptography.fernet import Fernet
 
 from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _get_or_generate_encryption_key() -> str:
+    """
+    Get encryption key from environment or generate a new one.
+
+    If no ENCRYPTION_KEY is set in environment, generates a new Fernet key.
+    In production, you should always set ENCRYPTION_KEY explicitly.
+
+    Returns:
+        Base64-encoded Fernet key as string
+    """
+    env_key = os.getenv('ENCRYPTION_KEY')
+    if env_key:
+        return env_key
+
+    # Generate new key for development
+    new_key = Fernet.generate_key().decode()
+    logger.warning(
+        "No ENCRYPTION_KEY found in environment. Generated a new one. "
+        "For production, set ENCRYPTION_KEY in your .env file!"
+    )
+    logger.warning(f"Generated ENCRYPTION_KEY: {new_key}")
+    return new_key
 
 
 @dataclass
@@ -106,6 +131,34 @@ class Settings:
     api_version: str = "1.0.0"
     api_description: str = "API for collecting, analyzing, and optimizing slow SQL queries"
 
+    # JWT Authentication settings
+    JWT_SECRET_KEY: str = field(
+        default_factory=lambda: os.getenv('JWT_SECRET_KEY', 'CHANGE_ME_IN_PRODUCTION_USE_LONG_RANDOM_STRING')
+    )
+    JWT_ALGORITHM: str = field(default_factory=lambda: os.getenv('JWT_ALGORITHM', 'HS256'))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = field(
+        default_factory=lambda: int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '30'))
+    )
+    REFRESH_TOKEN_EXPIRE_DAYS: int = field(
+        default_factory=lambda: int(os.getenv('REFRESH_TOKEN_EXPIRE_DAYS', '7'))
+    )
+
+    # Database password encryption (Fernet)
+    ENCRYPTION_KEY: str = field(
+        default_factory=lambda: os.getenv('ENCRYPTION_KEY', _get_or_generate_encryption_key())
+    )
+
+    # Initial admin user (for seeding)
+    INITIAL_ADMIN_EMAIL: str = field(
+        default_factory=lambda: os.getenv('INITIAL_ADMIN_EMAIL', 'mirko.siddi@gmail.com')
+    )
+    INITIAL_ADMIN_PASSWORD: str = field(
+        default_factory=lambda: os.getenv('INITIAL_ADMIN_PASSWORD', 'ChangeMe123!')
+    )
+    INITIAL_ADMIN_NAME: str = field(
+        default_factory=lambda: os.getenv('INITIAL_ADMIN_NAME', 'Mirko Siddi')
+    )
+
     def __post_init__(self):
         """Validate configuration after initialization."""
         logger.info("Configuration loaded:")
@@ -118,6 +171,17 @@ class Settings:
         logger.info(f"  Collector Interval: {self.collector_interval_seconds}s")
         logger.info(f"  Analyzer Interval: {self.analyzer_interval_seconds}s")
         logger.info(f"  AI Provider: {self.ai_provider}")
+        logger.info(f"  JWT Algorithm: {self.JWT_ALGORITHM}")
+        logger.info(f"  Access Token Expiry: {self.ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
+        logger.info(f"  Refresh Token Expiry: {self.REFRESH_TOKEN_EXPIRE_DAYS} days")
+
+        # Validate JWT secret key
+        if self.JWT_SECRET_KEY == 'CHANGE_ME_IN_PRODUCTION_USE_LONG_RANDOM_STRING':
+            logger.warning("Using default JWT_SECRET_KEY! Change this in production!")
+
+        # Validate encryption key
+        if len(self.ENCRYPTION_KEY) < 32:
+            logger.warning("ENCRYPTION_KEY seems short. Ensure it's a valid Fernet key!")
 
     def get_redis_url(self) -> str:
         """Get Redis connection URL."""
