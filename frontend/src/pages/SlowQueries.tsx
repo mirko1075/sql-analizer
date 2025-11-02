@@ -13,30 +13,35 @@ import {
 } from 'lucide-react';
 import { getSlowQueries } from '../services/api';
 import type { SlowQuery, PaginatedResponse } from '../types';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const SlowQueries: React.FC = () => {
   const navigate = useNavigate();
   const [queries, setQueries] = useState<PaginatedResponse<SlowQuery> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [filterDbType, setFilterDbType] = useState<string>('');
 
-  useEffect(() => {
-    loadQueries();
-  }, [page, filterDbType]);
-
   const loadQueries = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await getSlowQueries(page, pageSize, filterDbType || undefined);
       setQueries(data);
-    } catch (error) {
-      console.error('Failed to load queries:', error);
+    } catch (err) {
+      console.error('Failed to load queries:', err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadQueries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filterDbType]);
 
   const formatDuration = (ms: number): string => {
     if (ms < 1000) return `${ms.toFixed(0)}ms`;
@@ -78,6 +83,32 @@ const SlowQueries: React.FC = () => {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           <p className="mt-4 text-gray-600">Loading queries...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center max-w-md">
+          <div className="rounded-md bg-red-50 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Failed to load slow queries</h3>
+                <p className="mt-2 text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={loadQueries}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );

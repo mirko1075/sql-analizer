@@ -2,6 +2,102 @@
  * Type definitions for AI Query Analyzer frontend
  */
 
+// =============================================================================
+// AUTH & USER TYPES
+// =============================================================================
+
+export type UserRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  is_superuser: boolean;
+  preferences: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  full_name: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+// =============================================================================
+// ORGANIZATION & TEAM TYPES
+// =============================================================================
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  slug: string;
+  organization_id: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: UserRole;
+  joined_at: string;
+  user?: User;
+}
+
+// =============================================================================
+// DATABASE CONNECTION TYPES
+// =============================================================================
+
+export type DatabaseType = 'mysql' | 'postgres' | 'oracle' | 'sqlserver';
+
+export interface DatabaseConnection {
+  id: string;
+  name: string;
+  db_type: DatabaseType;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  team_id: string;
+  description?: string;
+  ssl_enabled: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  last_connected_at?: string;
+}
+
+// =============================================================================
+// SLOW QUERY TYPES
+// =============================================================================
+
 export interface SlowQuery {
   id: string;  // Representative query ID (most recent execution)
   fingerprint: string;
@@ -175,3 +271,45 @@ export interface PaginatedResponse<T> {
   page_size: number;
   total_pages: number;
 }
+
+// =============================================================================
+// AUTH CONTEXT TYPES
+// =============================================================================
+
+export interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
+export interface AuthContextType extends AuthState {
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshAccessToken: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
+}
+
+// =============================================================================
+// PERMISSION & ROLE TYPES
+// =============================================================================
+
+export const ROLE_HIERARCHY: Record<UserRole, number> = {
+  OWNER: 4,
+  ADMIN: 3,
+  MEMBER: 2,
+  VIEWER: 1,
+};
+
+// Check if user has required role level
+export const hasRequiredRole = (userRole: UserRole, requiredRole: UserRole): boolean => {
+  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
+};
+
+// Check if user can access collectors (admin/superuser only)
+export const canAccessCollectors = (user: User | null): boolean => {
+  return user?.is_superuser ?? false;
+};
+

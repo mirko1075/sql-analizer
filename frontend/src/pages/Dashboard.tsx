@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getStats, getCollectorStatus, getAnalyzerStatus, getHealth } from '../services/api';
 import type { StatsResponse, CollectorStatus, AnalyzerStatus, HealthStatus } from '../types';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -20,6 +21,7 @@ const Dashboard: React.FC = () => {
   const [analyzerStatus, setAnalyzerStatus] = useState<AnalyzerStatus | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     loadDashboardData();
@@ -30,6 +32,7 @@ const Dashboard: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
+      setError('');
       const [statsData, collectorData, analyzerData, healthData] = await Promise.all([
         getStats(),
         getCollectorStatus(),
@@ -41,8 +44,9 @@ const Dashboard: React.FC = () => {
       setCollectorStatus(collectorData);
       setAnalyzerStatus(analyzerData);
       setHealth(healthData);
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -54,6 +58,32 @@ const Dashboard: React.FC = () => {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center max-w-md">
+          <div className="rounded-md bg-red-50 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Failed to load dashboard</h3>
+                <p className="mt-2 text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={loadDashboardData}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );

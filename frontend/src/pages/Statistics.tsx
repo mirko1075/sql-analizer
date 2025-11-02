@@ -14,6 +14,7 @@ import {
   getQueryDistribution,
   getAIInsights,
 } from '../services/api';
+import { getErrorMessage } from '../utils/errorHandler';
 
 interface DailyMetric {
   metric_date: string;
@@ -96,18 +97,16 @@ interface AIInsights {
 
 const Statistics: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [performanceTrends, setPerformanceTrends] = useState<PerformanceTrends | null>(null);
   const [queryDistribution, setQueryDistribution] = useState<QueryDistribution | null>(null);
   const [aiInsights, setAIInsights] = useState<AIInsights | null>(null);
   const [timeRange, setTimeRange] = useState(7);
 
-  useEffect(() => {
-    loadData();
-  }, [timeRange]);
-
   const loadData = async () => {
     try {
       setLoading(true);
+      setError('');
       const [trends, distribution, insights] = await Promise.all([
         getPerformanceTrends({ days: timeRange }),
         getQueryDistribution({ limit: 10 }),
@@ -117,12 +116,18 @@ const Statistics: React.FC = () => {
       setPerformanceTrends(trends);
       setQueryDistribution(distribution);
       setAIInsights(insights);
-    } catch (error) {
-      console.error('Failed to load statistics:', error);
+    } catch (err) {
+      console.error('Failed to load statistics:', err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRange]);
 
   if (loading) {
     return (
@@ -130,6 +135,32 @@ const Statistics: React.FC = () => {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           <p className="mt-4 text-gray-600">Loading statistics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center max-w-md">
+          <div className="rounded-md bg-red-50 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Failed to load statistics</h3>
+                <p className="mt-2 text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={loadData}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );

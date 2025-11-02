@@ -24,10 +24,32 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for logging
+// Token management
+let accessToken: string | null = null;
+
+export const setAuthToken = (token: string | null) => {
+  accessToken = token;
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+  }
+};
+
+export const getAuthToken = (): string | null => {
+  return accessToken;
+};
+
+// Request interceptor for logging and auth
 api.interceptors.request.use(
   (config) => {
     console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+    
+    // Add token if available and not already set
+    if (accessToken && !config.headers['Authorization']) {
+      config.headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
     return config;
   },
   (error) => {
@@ -40,6 +62,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('[API Error]', error.response?.data || error.message);
+    
+    // Handle 401 Unauthorized (token expired or invalid)
+    if (error.response?.status === 401) {
+      // Dispatch custom event for auth error
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    }
+    
     return Promise.reject(error);
   }
 );

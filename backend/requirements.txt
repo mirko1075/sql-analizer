@@ -26,6 +26,8 @@ python-multipart==0.0.6
 
 # Authentication and Security
 cryptography==42.0.5
+# Security & Authentication
+bcrypt==4.0.1
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 
