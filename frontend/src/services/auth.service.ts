@@ -27,11 +27,11 @@ interface UserSession {
 }
 
 const AUTH_ENDPOINTS = {
-  REGISTER: '/auth/register',
-  LOGIN: '/auth/login',
-  LOGOUT: '/auth/logout',
-  REFRESH: '/auth/refresh',
-  ME: '/auth/me',
+  REGISTER: '/api/v1/auth/register',
+  LOGIN: '/api/v1/auth/login',
+  LOGOUT: '/api/v1/auth/logout',
+  REFRESH: '/api/v1/auth/refresh',
+  ME: '/api/v1/auth/me',
 };
 
 export const authService = {

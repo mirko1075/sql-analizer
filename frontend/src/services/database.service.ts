@@ -13,7 +13,7 @@ export const databaseConnectionService = {
    */
   async list(): Promise<DatabaseConnection[]> {
     const response = await api.get('/api/v1/database-connections');
-    return response.data;
+    return response.data.connections || response.data;
   },
 
   /**

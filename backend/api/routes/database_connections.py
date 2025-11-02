@@ -18,7 +18,8 @@ from backend.core.logger import get_logger
 from backend.core.dependencies import (
     get_current_active_user,
     get_current_team,
-    require_role
+    require_role,
+    get_visible_database_connections
 )
 from backend.db.models import (
     User,
@@ -137,26 +138,28 @@ def test_database_connection(
     "",
     response_model=DatabaseConnectionListResponse,
     summary="List database connections",
-    description="Get all database connections for the current team"
+    description="Get all database connections visible to the current user"
 )
 async def list_connections(
-    current_user: User = Depends(get_current_active_user),
-    current_team: Team = Depends(get_current_team),
-    db: Session = Depends(get_db)
+    connections: List[DatabaseConnection] = Depends(get_visible_database_connections),
 ):
     """
-    List all database connections for the current team.
+    List all database connections visible to the current user.
+
+    Uses visibility filtering based on scope:
+    - TEAM_ONLY: Team members only
+    - ORG_WIDE: All organization members
+    - USER_ONLY: Owner only
 
     Returns connections ordered by name.
     """
     try:
-        connections = db.query(DatabaseConnection).filter(
-            DatabaseConnection.team_id == current_team.id
-        ).order_by(DatabaseConnection.name).all()
+        # Sort by name
+        sorted_connections = sorted(connections, key=lambda c: c.name)
 
         return DatabaseConnectionListResponse(
-            total=len(connections),
-            connections=connections
+            total=len(sorted_connections),
+            connections=sorted_connections
         )
 
     except Exception as e:
@@ -212,6 +215,7 @@ async def create_connection(
         # Create connection
         connection = DatabaseConnection(
             team_id=current_team.id,
+            organization_id=current_team.organization_id,
             name=request.name,
             db_type=request.db_type,
             host=request.host,
@@ -221,8 +225,14 @@ async def create_connection(
             encrypted_password=encrypted_password,
             ssl_enabled=request.ssl_enabled,
             ssl_ca=request.ssl_ca,
+            visibility_scope=request.visibility_scope or 'TEAM_ONLY',
+            owner_user_id=current_user.id,
+            is_legacy=False,
             is_active=True
         )
+
+        # Generate agent token
+        connection.generate_agent_token()
 
         db.add(connection)
         db.commit()
@@ -363,6 +373,8 @@ async def update_connection(
             connection.ssl_enabled = request.ssl_enabled
         if request.ssl_ca is not None:
             connection.ssl_ca = request.ssl_ca
+        if request.visibility_scope is not None:
+            connection.visibility_scope = request.visibility_scope
         if request.is_active is not None:
             connection.is_active = request.is_active
 
@@ -538,4 +550,128 @@ async def test_existing_connection(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to test database connection: {str(e)}"
+        )
+
+
+# =============================================================================
+# AGENT TOKEN MANAGEMENT
+# =============================================================================
+
+
+@router.post(
+    "/{connection_id}/rotate-token",
+    response_model=MessageResponse,
+    summary="Rotate agent token",
+    description="Regenerate the agent token for a database connection (requires OWNER or ADMIN role)",
+    dependencies=[Depends(require_role(["OWNER", "ADMIN"]))]
+)
+async def rotate_agent_token(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    db: Session = Depends(get_db)
+):
+    """
+    Rotate (regenerate) the agent token for a database connection.
+
+    This will invalidate the old token. Collectors using the old token
+    will need to be updated with the new token.
+
+    Requires OWNER or ADMIN role.
+    """
+    try:
+        connection = db.query(DatabaseConnection).filter(
+            DatabaseConnection.id == connection_id,
+            DatabaseConnection.team_id == current_team.id
+        ).first()
+
+        if not connection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Database connection not found"
+            )
+
+        # Rotate the token
+        old_token_preview = connection.mask_agent_token()
+        connection.rotate_agent_token()
+
+        db.commit()
+        db.refresh(connection)
+
+        logger.warning(
+            f"User {current_user.email} rotated agent token for '{connection.name}' "
+            f"(old: {old_token_preview}, new: {connection.mask_agent_token()})"
+        )
+
+        return MessageResponse(
+            message=f"Agent token rotated successfully. Old token is now invalid. New token: {connection.mask_agent_token()}"
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error rotating agent token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to rotate agent token"
+        )
+
+
+@router.get(
+    "/{connection_id}/agent-token",
+    summary="Get full agent token",
+    description="Get the full agent token for a database connection (requires OWNER or ADMIN role)",
+    dependencies=[Depends(require_role(["OWNER", "ADMIN"]))]
+)
+async def get_agent_token(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the full agent token for a database connection.
+
+    Use this to copy/paste the token for collector configuration.
+    Be careful not to expose this token publicly.
+
+    Requires OWNER or ADMIN role.
+    """
+    try:
+        connection = db.query(DatabaseConnection).filter(
+            DatabaseConnection.id == connection_id,
+            DatabaseConnection.team_id == current_team.id
+        ).first()
+
+        if not connection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Database connection not found"
+            )
+
+        if not connection.agent_token:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No agent token found for this connection"
+            )
+
+        logger.info(
+            f"User {current_user.email} retrieved agent token for '{connection.name}'"
+        )
+
+        return {
+            "agent_token": connection.agent_token,
+            "created_at": connection.agent_token_created_at.isoformat() if connection.agent_token_created_at else None,
+            "connection_name": connection.name
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving agent token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve agent token"
         )

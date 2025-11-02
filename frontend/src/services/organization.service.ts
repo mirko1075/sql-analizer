@@ -13,7 +13,7 @@ export const organizationService = {
    */
   async list(): Promise<Organization[]> {
     const response = await api.get('/api/v1/organizations');
-    return response.data;
+    return response.data.organizations || response.data;
   },
 
   /**

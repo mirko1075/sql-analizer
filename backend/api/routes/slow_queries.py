@@ -20,7 +20,7 @@ from backend.api.schemas.slow_query import (
     AIAnalysisResultSchema,
 )
 from backend.core.logger import get_logger
-from backend.core.dependencies import get_current_active_user, get_current_team
+from backend.core.dependencies import get_current_active_user, get_current_team, get_visible_database_connection_ids
 from backend.services.ai_analysis import analyze_query_with_ai
 
 logger = get_logger(__name__)
@@ -43,6 +43,7 @@ async def list_slow_queries(
     status: Optional[str] = Query(None, description="Filter by status: NEW, ANALYZED, IGNORED, ERROR"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -81,6 +82,13 @@ async def list_slow_queries(
 
         # Filter by team (REQUIRED for multi-tenancy)
         query = query.filter(SlowQueryRaw.team_id == current_team.id)
+
+        # Filter by visible database connections (visibility scope)
+        if visible_connection_ids:
+            query = query.filter(SlowQueryRaw.database_connection_id.in_(visible_connection_ids))
+        else:
+            # User has no visible connections - return empty result
+            return SlowQueryListResponse(items=[], total=0, page=page, page_size=page_size, total_pages=0)
 
         # Apply additional filters
         if source_db_type:
@@ -162,16 +170,18 @@ async def analyze_query_with_ai_endpoint(
     force: bool = Query(False, description="Re-run AI analysis even if cached"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
     Run AI-powered analysis for a specific slow query and return the generated insights.
     """
     try:
-        # Verify the query belongs to the current team
+        # Verify the query belongs to the current team and is from a visible database connection
         slow_query = db.query(SlowQueryRaw).filter(
             SlowQueryRaw.id == query_id,
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).first()
 
         if not slow_query:
@@ -198,6 +208,7 @@ async def get_slow_query(
     query_id: UUID,
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -211,10 +222,11 @@ async def get_slow_query(
     - Optimization suggestions
     """
     try:
-        # Query slow query with its analysis, filtered by team
+        # Query slow query with its analysis, filtered by team and visible connections
         slow_query = db.query(SlowQueryRaw).filter(
             SlowQueryRaw.id == query_id,
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).first()
 
         if not slow_query:
@@ -241,6 +253,7 @@ async def get_queries_by_fingerprint(
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -249,10 +262,11 @@ async def get_queries_by_fingerprint(
     Useful for analyzing how the same query pattern performs over time.
     """
     try:
-        # Filter by fingerprint and team
+        # Filter by fingerprint, team, and visible connections
         queries = db.query(SlowQueryRaw).filter(
             SlowQueryRaw.fingerprint == fingerprint_hash,
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).order_by(desc(SlowQueryRaw.captured_at)).limit(limit).all()
 
         if not queries:
@@ -276,6 +290,7 @@ async def delete_slow_query(
     query_id: UUID,
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -284,10 +299,11 @@ async def delete_slow_query(
     This will also cascade delete the associated analysis result.
     """
     try:
-        # Verify the query belongs to the current team before deleting
+        # Verify the query belongs to the current team and is from a visible connection before deleting
         slow_query = db.query(SlowQueryRaw).filter(
             SlowQueryRaw.id == query_id,
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).first()
 
         if not slow_query:

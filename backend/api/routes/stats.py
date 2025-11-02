@@ -5,6 +5,7 @@ Provides endpoints for aggregate statistics and insights.
 """
 from typing import List
 from datetime import datetime, timedelta
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -20,7 +21,7 @@ from backend.api.schemas.stats import (
     QueryTrendSchema,
 )
 from backend.core.logger import get_logger
-from backend.core.dependencies import get_current_active_user, get_current_team
+from backend.core.dependencies import get_current_active_user, get_current_team, get_visible_database_connection_ids
 
 logger = get_logger(__name__)
 
@@ -38,6 +39,7 @@ async def get_top_tables(
     source_db_type: str = Query(None, description="Filter by database type"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -46,7 +48,11 @@ async def get_top_tables(
     This helps identify which tables are bottlenecks in the system.
     """
     try:
-        # Query impactful_tables view with team filtering
+        # Early return if no visible connections
+        if not visible_connection_ids:
+            return []
+
+        # Query impactful_tables view with team and visibility filtering
         # Since view doesn't have team_id, we join with slow_queries_raw
         query = text("""
             SELECT DISTINCT
@@ -61,6 +67,7 @@ async def get_top_tables(
                 ON it.source_db_type = sq.source_db_type
                 AND it.source_db_host = sq.source_db_host
             WHERE sq.team_id = :team_id
+                AND sq.database_connection_id = ANY(CAST(:visible_connection_ids AS uuid[]))
                 AND (:db_type IS NULL OR it.source_db_type = :db_type)
             ORDER BY it.query_count DESC
             LIMIT :limit
@@ -68,7 +75,12 @@ async def get_top_tables(
 
         result = db.execute(
             query,
-            {"team_id": str(current_team.id), "db_type": source_db_type, "limit": limit}
+            {
+                "team_id": str(current_team.id),
+                "visible_connection_ids": [str(cid) for cid in visible_connection_ids],
+                "db_type": source_db_type,
+                "limit": limit
+            }
         ).fetchall()
 
         return [
@@ -99,6 +111,7 @@ async def get_database_stats(
     db_host: str,
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -111,17 +124,31 @@ async def get_database_stats(
     - High-impact queries count
     """
     try:
-        # Get basic counts with team filtering
+        # Early return if no visible connections
+        if not visible_connection_ids:
+            return DatabaseStatsSchema(
+                source_db_type=db_type,
+                source_db_host=db_host,
+                total_slow_queries=0,
+                analyzed_queries=0,
+                pending_queries=0,
+                avg_duration_ms=0.0,
+                high_impact_count=0
+            )
+
+        # Get basic counts with team and visibility filtering
         total_count = db.query(func.count(SlowQueryRaw.id)).filter(
             SlowQueryRaw.source_db_type == db_type,
             SlowQueryRaw.source_db_host == db_host,
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).scalar() or 0
 
         analyzed_count = db.query(func.count(SlowQueryRaw.id)).filter(
             SlowQueryRaw.source_db_type == db_type,
             SlowQueryRaw.source_db_host == db_host,
             SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids),
             SlowQueryRaw.status == 'ANALYZED'
         ).scalar() or 0
 
@@ -129,22 +156,25 @@ async def get_database_stats(
             SlowQueryRaw.source_db_type == db_type,
             SlowQueryRaw.source_db_host == db_host,
             SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids),
             SlowQueryRaw.status == 'NEW'
         ).scalar() or 0
 
         avg_duration = db.query(func.avg(SlowQueryRaw.duration_ms)).filter(
             SlowQueryRaw.source_db_type == db_type,
             SlowQueryRaw.source_db_host == db_host,
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).scalar() or 0
 
-        # Count high-impact queries with team filtering
+        # Count high-impact queries with team and visibility filtering
         high_impact_count = db.query(func.count(AnalysisResult.id)).join(
             SlowQueryRaw, AnalysisResult.slow_query_id == SlowQueryRaw.id
         ).filter(
             SlowQueryRaw.source_db_type == db_type,
             SlowQueryRaw.source_db_host == db_host,
             SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids),
             AnalysisResult.improvement_level.in_(['HIGH', 'CRITICAL'])
         ).scalar() or 0
 
@@ -172,6 +202,7 @@ async def get_database_stats(
 async def get_global_stats(
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -185,31 +216,47 @@ async def get_global_stats(
     - Recent query trends
     """
     try:
-        # Total queries with team filtering
+        # Early return if no visible connections
+        if not visible_connection_ids:
+            return GlobalStatsResponse(
+                total_slow_queries=0,
+                total_analyzed=0,
+                total_pending=0,
+                databases_monitored=0,
+                top_tables=[],
+                improvement_summary=[],
+                recent_trend=[]
+            )
+
+        # Total queries with team and visibility filtering
         total_queries = db.query(func.count(SlowQueryRaw.id)).filter(
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).scalar() or 0
 
-        # Analyzed queries with team filtering
+        # Analyzed queries with team and visibility filtering
         analyzed_count = db.query(func.count(SlowQueryRaw.id)).filter(
             SlowQueryRaw.status == 'ANALYZED',
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).scalar() or 0
 
-        # Pending queries with team filtering
+        # Pending queries with team and visibility filtering
         pending_count = db.query(func.count(SlowQueryRaw.id)).filter(
             SlowQueryRaw.status == 'NEW',
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).scalar() or 0
 
-        # Number of unique databases with team filtering
+        # Number of unique databases with team and visibility filtering
         databases_count = db.query(
             func.count(func.distinct(SlowQueryRaw.source_db_host))
         ).filter(
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).scalar() or 0
 
-        # Top tables (limit to 5 for global view) with team filtering
+        # Top tables (limit to 5 for global view) with team and visibility filtering
         top_tables_query = text("""
             SELECT DISTINCT
                 it.source_db_type,
@@ -223,12 +270,16 @@ async def get_global_stats(
                 ON it.source_db_type = sq.source_db_type
                 AND it.source_db_host = sq.source_db_host
             WHERE sq.team_id = :team_id
+                AND sq.database_connection_id = ANY(CAST(:visible_connection_ids AS uuid[]))
             ORDER BY it.query_count DESC
             LIMIT 5
         """)
         top_tables_result = db.execute(
             top_tables_query,
-            {"team_id": str(current_team.id)}
+            {
+                "team_id": str(current_team.id),
+                "visible_connection_ids": [str(cid) for cid in visible_connection_ids]
+            }
         ).fetchall()
         top_tables = [
             TableImpactSchema(
@@ -242,14 +293,15 @@ async def get_global_stats(
             for row in top_tables_result
         ]
 
-        # Improvement summary with team filtering
+        # Improvement summary with team and visibility filtering
         improvement_summary_query = db.query(
             AnalysisResult.improvement_level,
             func.count(AnalysisResult.id).label('count')
         ).join(
             SlowQueryRaw, AnalysisResult.slow_query_id == SlowQueryRaw.id
         ).filter(
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).group_by(AnalysisResult.improvement_level).all()
 
         improvement_summary = [
@@ -260,7 +312,7 @@ async def get_global_stats(
             for level, count in improvement_summary_query
         ]
 
-        # Recent trend (last 7 days) with team filtering
+        # Recent trend (last 7 days) with team and visibility filtering
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
         trend_query = db.query(
             func.date(SlowQueryRaw.captured_at).label('date'),
@@ -269,7 +321,8 @@ async def get_global_stats(
             func.max(SlowQueryRaw.duration_ms).label('max_duration_ms')
         ).filter(
             SlowQueryRaw.captured_at >= seven_days_ago,
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).group_by(func.date(SlowQueryRaw.captured_at)).order_by('date').all()
 
         recent_trend = [
@@ -308,13 +361,14 @@ async def get_global_stats(
 async def get_stats(
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
     Aggregate statistics endpoint for frontend compatibility.
     Returns same data as /global for now.
     """
-    return await get_global_stats(current_user, current_team, db)
+    return await get_global_stats(current_user, current_team, visible_connection_ids, db)
 
 
 @router.get(
@@ -325,12 +379,17 @@ async def get_stats(
 async def list_monitored_databases(
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
     Get a list of all databases that have slow queries recorded for the current team.
     """
     try:
+        # Early return if no visible connections
+        if not visible_connection_ids:
+            return []
+
         databases = db.query(
             SlowQueryRaw.source_db_type,
             SlowQueryRaw.source_db_host,
@@ -338,7 +397,8 @@ async def list_monitored_databases(
             func.count(SlowQueryRaw.id).label('query_count'),
             func.max(SlowQueryRaw.captured_at).label('last_seen')
         ).filter(
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).group_by(
             SlowQueryRaw.source_db_type,
             SlowQueryRaw.source_db_host,
@@ -370,6 +430,7 @@ async def get_top_slow_queries(
     limit: int = Query(10, ge=1, le=50, description="Number of queries to return"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -377,6 +438,10 @@ async def get_top_slow_queries(
     Returns aggregated data grouped by fingerprint.
     """
     try:
+        # Early return if no visible connections
+        if not visible_connection_ids:
+            return []
+
         queries = db.query(
             SlowQueryRaw.fingerprint,
             SlowQueryRaw.source_db_type,
@@ -386,7 +451,8 @@ async def get_top_slow_queries(
             func.min(SlowQueryRaw.captured_at).label('first_seen'),
             func.max(SlowQueryRaw.captured_at).label('last_seen')
         ).filter(
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).group_by(
             SlowQueryRaw.fingerprint,
             SlowQueryRaw.source_db_type,
@@ -402,7 +468,8 @@ async def get_top_slow_queries(
                 SlowQueryRaw.fingerprint == query.fingerprint,
                 SlowQueryRaw.source_db_type == query.source_db_type,
                 SlowQueryRaw.source_db_host == query.source_db_host,
-                SlowQueryRaw.team_id == current_team.id
+                SlowQueryRaw.team_id == current_team.id,
+                SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
             ).order_by(desc(SlowQueryRaw.captured_at)).first()
 
             result.append({
@@ -433,6 +500,7 @@ async def get_unanalyzed_queries(
     limit: int = Query(10, ge=1, le=50, description="Number of queries to return"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -440,6 +508,10 @@ async def get_unanalyzed_queries(
     Returns aggregated data grouped by fingerprint.
     """
     try:
+        # Early return if no visible connections
+        if not visible_connection_ids:
+            return []
+
         queries = db.query(
             SlowQueryRaw.fingerprint,
             SlowQueryRaw.source_db_type,
@@ -450,7 +522,8 @@ async def get_unanalyzed_queries(
             func.max(SlowQueryRaw.captured_at).label('last_seen')
         ).filter(
             SlowQueryRaw.status == 'NEW',
-            SlowQueryRaw.team_id == current_team.id
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).group_by(
             SlowQueryRaw.fingerprint,
             SlowQueryRaw.source_db_type,
@@ -467,7 +540,8 @@ async def get_unanalyzed_queries(
                 SlowQueryRaw.source_db_type == query.source_db_type,
                 SlowQueryRaw.source_db_host == query.source_db_host,
                 SlowQueryRaw.status == 'NEW',
-                SlowQueryRaw.team_id == current_team.id
+                SlowQueryRaw.team_id == current_team.id,
+                SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
             ).order_by(desc(SlowQueryRaw.captured_at)).first()
 
             result.append({

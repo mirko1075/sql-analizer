@@ -79,6 +79,9 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+
+      # Security Settings
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-7BHYHtN7_SZKavPg-p-cKBlZN708esKVqmLS9Jk2BIU=}
     depends_on:
       internal-db:
         condition: service_healthy

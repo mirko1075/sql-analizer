@@ -15,9 +15,10 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
-from backend.db.models import User, UserSession, Team, TeamMember
+from backend.db.models import User, UserSession, Team, TeamMember, DatabaseConnection
 from backend.core.security import decode_token, validate_token_type
 from backend.core.logger import get_logger
+from backend.core import visibility
 
 logger = get_logger(__name__)
 
@@ -437,3 +438,59 @@ def get_user_teams(user: User, db: Session) -> List[Team]:
     ).all()
 
     return teams
+
+
+# =============================================================================
+# VISIBILITY FILTERING DEPENDENCIES
+# =============================================================================
+
+
+async def get_visible_database_connections(
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    db: Session = Depends(get_db)
+) -> List[DatabaseConnection]:
+    """
+    Get all database connections visible to the current user in the current team.
+
+    This dependency can be injected into endpoints that need to work with
+    visible database connections.
+
+    Args:
+        current_user: Current authenticated user
+        current_team: Current team context
+        db: Database session
+
+    Returns:
+        List of visible DatabaseConnection objects
+    """
+    return visibility.get_visible_database_connections(
+        user=current_user,
+        db=db,
+        team_id=current_team.id
+    )
+
+
+async def get_visible_database_connection_ids(
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    db: Session = Depends(get_db)
+) -> List[UUID]:
+    """
+    Get IDs of all database connections visible to the current user.
+
+    Useful for filtering queries on data tables (SlowQueryRaw, metrics, etc.).
+
+    Args:
+        current_user: Current authenticated user
+        current_team: Current team context
+        db: Database session
+
+    Returns:
+        List of visible database connection UUIDs
+    """
+    return visibility.get_visible_database_connection_ids(
+        user=current_user,
+        db=db,
+        team_id=current_team.id
+    )

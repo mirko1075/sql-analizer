@@ -2,7 +2,8 @@
 API routes for statistics and trend analysis.
 """
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, desc, and_
@@ -19,7 +20,7 @@ from backend.api.schemas.statistics import (
 )
 from backend.db.models import QueryMetricsDaily, QueryFingerprintMetrics, User, Team
 from backend.db.session import get_db
-from backend.core.dependencies import get_current_active_user, get_current_team
+from backend.core.dependencies import get_current_active_user, get_current_team, get_visible_database_connection_ids
 
 router = APIRouter(prefix="/statistics", tags=["Statistics"])
 
@@ -31,6 +32,7 @@ def get_performance_trends(
     source_db_host: Optional[str] = Query(None, description="Filter by database host"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db),
 ):
     """
@@ -42,10 +44,28 @@ def get_performance_trends(
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
 
-    # Build query with team filtering
+    # Early return if no visible connections
+    if not visible_connection_ids:
+        return PerformanceTrendsResponse(
+            metrics=[],
+            date_range={
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+            },
+            summary={
+                "total_queries": 0,
+                "avg_duration_ms": 0,
+                "max_p95_duration_ms": 0,
+                "total_high_impact": 0,
+                "days_covered": 0,
+            }
+        )
+
+    # Build query with team and visibility filtering
     query = db.query(QueryMetricsDaily).filter(
         QueryMetricsDaily.metric_date >= start_date,
-        QueryMetricsDaily.team_id == current_team.id
+        QueryMetricsDaily.team_id == current_team.id,
+        QueryMetricsDaily.database_connection_id.in_(visible_connection_ids)
     )
 
     if source_db_type:
@@ -90,6 +110,7 @@ def get_query_distribution(
     source_db_host: Optional[str] = Query(None, description="Filter by database host"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db),
 ):
     """
@@ -97,9 +118,19 @@ def get_query_distribution(
 
     Returns top queries by various metrics and efficiency histogram.
     """
-    # Base query with team filtering
+    # Early return if no visible connections
+    if not visible_connection_ids:
+        return QueryDistributionResponse(
+            top_slowest=[],
+            top_frequent=[],
+            top_inefficient=[],
+            efficiency_histogram=[],
+        )
+
+    # Base query with team and visibility filtering
     base_query = db.query(QueryFingerprintMetrics).filter(
-        QueryFingerprintMetrics.team_id == current_team.id
+        QueryFingerprintMetrics.team_id == current_team.id,
+        QueryFingerprintMetrics.database_connection_id.in_(visible_connection_ids)
     )
 
     if source_db_type:
@@ -127,7 +158,8 @@ def get_query_distribution(
     # Efficiency histogram
     all_ratios = db.query(QueryFingerprintMetrics.avg_efficiency_ratio).filter(
         QueryFingerprintMetrics.avg_efficiency_ratio.isnot(None),
-        QueryFingerprintMetrics.team_id == current_team.id
+        QueryFingerprintMetrics.team_id == current_team.id,
+        QueryFingerprintMetrics.database_connection_id.in_(visible_connection_ids)
     )
     if source_db_type:
         all_ratios = all_ratios.filter(QueryFingerprintMetrics.source_db_type == source_db_type)
@@ -171,6 +203,7 @@ def get_ai_insights(
     source_db_host: Optional[str] = Query(None, description="Filter by database host"),
     current_user: User = Depends(get_current_active_user),
     current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db),
 ):
     """
@@ -178,10 +211,20 @@ def get_ai_insights(
 
     Returns high-priority queries and AI analysis statistics.
     """
-    # Base query for queries with AI analysis and team filtering
+    # Early return if no visible connections
+    if not visible_connection_ids:
+        return AIInsightsResponse(
+            high_priority_queries=[],
+            recently_analyzed=[],
+            total_analyzed=0,
+            analysis_distribution={},
+        )
+
+    # Base query for queries with AI analysis and team and visibility filtering
     base_query = db.query(QueryFingerprintMetrics).filter(
         QueryFingerprintMetrics.has_analysis == 1,
-        QueryFingerprintMetrics.team_id == current_team.id
+        QueryFingerprintMetrics.team_id == current_team.id,
+        QueryFingerprintMetrics.database_connection_id.in_(visible_connection_ids)
     )
 
     if source_db_type:

@@ -13,7 +13,7 @@ export const teamService = {
    */
   async list(): Promise<Team[]> {
     const response = await api.get('/api/v1/teams');
-    return response.data;
+    return response.data.teams || response.data;
   },
 
   /**
@@ -68,7 +68,7 @@ export const teamService = {
    */
   async listMembers(teamId: string): Promise<TeamMember[]> {
     const response = await api.get(`/api/v1/teams/${teamId}/members`);
-    return response.data;
+    return response.data.members || response.data;
   },
 
   /**
