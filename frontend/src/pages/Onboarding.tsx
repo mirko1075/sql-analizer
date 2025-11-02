@@ -22,7 +22,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import onboardingService, {
   type DatabaseConfig,
-  type OnboardingStartResponse,
   type OnboardingStatusResponse,
 } from '../services/onboarding.service';
 import { getErrorMessage } from '../utils/errorHandler';
