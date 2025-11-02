@@ -16,6 +16,7 @@ import Collectors from './pages/Collectors';
 import Organizations from './pages/Organizations';
 import Teams from './pages/Teams';
 import DatabaseConnections from './pages/DatabaseConnections';
+import Onboarding from './pages/Onboarding';
 import './index.css';
 
 // Create a React Query client
@@ -169,6 +170,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <Onboarding />
                   </ProtectedRoute>
                 }
               />

@@ -247,12 +247,189 @@ async def ingest_slow_queries(
 
 
 # =============================================================================
-# COLLECTOR HEARTBEAT (REQUIRES JWT SESSION TOKEN)
+# COLLECTOR CONFIG (NO JWT REQUIRED - USES AGENT_TOKEN)
+# =============================================================================
+
+
+@router.get("/config")
+async def get_collector_config(
+    agent_token: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get collector configuration including database connections to monitor.
+
+    Does NOT require JWT authentication - uses agent_token from query parameter.
+    This endpoint is called by the collector agent to get its configuration.
+
+    Returns list of databases this collector should monitor.
+    """
+    # Find collector by agent_token through database connections
+    db_connections = db.query(DatabaseConnection).filter(
+        DatabaseConnection.agent_token == agent_token,
+        DatabaseConnection.is_active == True
+    ).all()
+
+    if not db_connections:
+        logger.warning("Config fetch failed: Invalid or inactive agent token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or inactive agent token"
+        )
+
+    # Get the team and organization from the first database connection
+    first_conn = db_connections[0]
+    team_id = first_conn.team_id
+    organization_id = first_conn.organization_id
+
+    # Get all collectors for this team that might be associated with these databases
+    collectors = db.query(Collector).filter(
+        Collector.team_id == team_id
+    ).all()
+
+    # Get all database connections for this collector via collector_databases
+    all_db_connections = []
+    for collector in collectors:
+        collector_dbs = db.query(CollectorDatabase).filter(
+            CollectorDatabase.collector_id == collector.id
+        ).all()
+
+        for coll_db in collector_dbs:
+            db_conn = db.query(DatabaseConnection).filter(
+                DatabaseConnection.id == coll_db.database_connection_id,
+                DatabaseConnection.is_active == True
+            ).first()
+
+            if db_conn and db_conn not in all_db_connections:
+                all_db_connections.append(db_conn)
+
+    # If no databases found via collector_databases, use the ones with matching agent_token
+    if not all_db_connections:
+        all_db_connections = db_connections
+
+    # Build database config list
+    databases = []
+    for db_conn in all_db_connections:
+        from backend.core.security import decrypt_db_password
+        try:
+            decrypted_password = decrypt_db_password(db_conn.encrypted_password)
+        except Exception as e:
+            logger.error(f"Failed to decrypt password for database {db_conn.id}: {e}")
+            continue
+
+        databases.append({
+            "id": str(db_conn.id),
+            "name": db_conn.name,
+            "db_type": db_conn.db_type,
+            "host": db_conn.host,
+            "port": db_conn.port,
+            "database_name": db_conn.database_name,
+            "username": db_conn.username,
+            "password": decrypted_password,
+            "ssl_enabled": db_conn.ssl_enabled,
+            "ssl_ca": db_conn.ssl_ca
+        })
+
+    logger.info(f"Config fetched for team {team_id}: {len(databases)} databases")
+
+    return {
+        "success": True,
+        "organization_id": str(organization_id),
+        "team_id": str(team_id),
+        "databases": databases,
+        "collection_interval_seconds": 300  # 5 minutes default
+    }
+
+
+# =============================================================================
+# COLLECTOR HEARTBEAT (NO JWT REQUIRED - USES AGENT_TOKEN)
+# =============================================================================
+
+
+@router.post("/heartbeat")
+async def collector_heartbeat(
+    request: CollectorHeartbeatRequest,
+    agent_token: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Update collector heartbeat and status.
+
+    Does NOT require JWT authentication - uses agent_token from query parameter.
+    This endpoint is called periodically by the collector agent.
+    """
+    # Find database connection by agent_token
+    db_connection = db.query(DatabaseConnection).filter(
+        DatabaseConnection.agent_token == agent_token,
+        DatabaseConnection.is_active == True
+    ).first()
+
+    if not db_connection:
+        logger.warning("Heartbeat failed: Invalid or inactive agent token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or inactive agent token"
+        )
+
+    # Find or create collector for this database connection
+    # Try to find existing collector linked to this database
+    collector_db_link = db.query(CollectorDatabase).filter(
+        CollectorDatabase.database_connection_id == db_connection.id
+    ).first()
+
+    if collector_db_link:
+        collector = db.query(Collector).filter(
+            Collector.id == collector_db_link.collector_id
+        ).first()
+    else:
+        # No collector found, create one
+        collector = Collector(
+            team_id=db_connection.team_id,
+            organization_id=db_connection.organization_id,
+            name=f"Auto-created collector for {db_connection.name}",
+            hostname=None,
+            version=None,
+            status='ACTIVE',
+            last_heartbeat=datetime.utcnow()
+        )
+        db.add(collector)
+        db.flush()
+
+        # Link collector to database
+        new_link = CollectorDatabase(
+            collector_id=collector.id,
+            database_connection_id=db_connection.id
+        )
+        db.add(new_link)
+
+    # Update heartbeat and status
+    collector.last_heartbeat = datetime.utcnow()
+    if request.status:
+        collector.status = request.status
+
+    # Update database connection's last_connected_at
+    db_connection.last_connected_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(collector)
+
+    logger.info(f"Heartbeat received from collector {collector.id}, status: {collector.status}")
+
+    return {
+        "success": True,
+        "collector_id": str(collector.id),
+        "last_heartbeat": collector.last_heartbeat.isoformat(),
+        "status": collector.status
+    }
+
+
+# =============================================================================
+# LEGACY COLLECTOR HEARTBEAT (REQUIRES JWT SESSION TOKEN)
 # =============================================================================
 
 
 @router.post("/{collector_id}/heartbeat")
-async def collector_heartbeat(
+async def collector_heartbeat_legacy(
     collector_id: UUID,
     request: CollectorHeartbeatRequest,
     db: Session = Depends(get_db),
@@ -260,9 +437,10 @@ async def collector_heartbeat(
     current_team: Team = Depends(get_current_team)
 ):
     """
-    Update collector heartbeat and status.
+    Update collector heartbeat and status (legacy endpoint with JWT).
 
     Requires JWT authentication (session token from registration).
+    Kept for backward compatibility.
     """
     # Get collector
     collector = db.query(Collector).filter(
