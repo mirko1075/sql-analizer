@@ -17,8 +17,10 @@ from backend.api.schemas.slow_query import (
     SlowQueryWithAnalysis,
     SlowQueryListResponse,
     ErrorResponse,
+    AIAnalysisResultSchema,
 )
 from backend.core.logger import get_logger
+from backend.services.ai_analysis import analyze_query_with_ai
 
 logger = get_logger(__name__)
 
@@ -135,6 +137,28 @@ async def list_slow_queries(
     except Exception as e:
         logger.error(f"Error listing slow queries: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{query_id}/analyze-ai",
+    response_model=AIAnalysisResultSchema,
+    summary="Run AI-assisted analysis for a slow query",
+)
+async def analyze_query_with_ai_endpoint(
+    query_id: UUID,
+    force: bool = Query(False, description="Re-run AI analysis even if cached"),
+):
+    """
+    Run AI-powered analysis for a specific slow query and return the generated insights.
+    """
+    try:
+        result = analyze_query_with_ai(query_id, force=force)
+        return AIAnalysisResultSchema.model_validate(result)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("AI analysis failed for query %s: %s", query_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="AI analysis failed") from exc
 
 
 @router.get(

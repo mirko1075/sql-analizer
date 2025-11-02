@@ -3,11 +3,14 @@ Analyzer management endpoints.
 
 API routes for triggering query analysis and managing the analyzer service.
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from datetime import datetime
 from typing import Dict, Any
+
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 
 from backend.core.logger import get_logger
 from backend.services.analyzer import QueryAnalyzer
+from backend.services.scheduler import get_scheduler
 
 logger = get_logger(__name__)
 
@@ -35,6 +38,9 @@ async def analyze_pending_queries(
             logger.info(f"Manual analysis triggered via API (limit={limit})")
             analyzer = QueryAnalyzer()
             count = analyzer.analyze_all_pending(limit=limit)
+            scheduler = get_scheduler()
+            scheduler.analyzed_count += count
+            scheduler.last_analyzer_run = datetime.utcnow()
             logger.info(f"Manual analysis completed: {count} queries analyzed")
         except Exception as e:
             logger.error(f"Manual analysis failed: {e}", exc_info=True)
@@ -67,6 +73,9 @@ async def analyze_query(
             logger.info(f"Manual analysis triggered for query {query_id}")
             analyzer = QueryAnalyzer()
             result_id = analyzer.analyze_query(query_id)
+            scheduler = get_scheduler()
+            scheduler.analyzed_count += 1 if result_id else 0
+            scheduler.last_analyzer_run = datetime.utcnow()
             if result_id:
                 logger.info(f"Analysis completed for query {query_id}: {result_id}")
             else:

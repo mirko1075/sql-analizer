@@ -75,12 +75,10 @@ services:
       LOG_LEVEL: INFO
       ENV: development
 
-      # AI Provider Settings (optional)
-      # Set AI_PROVIDER to 'openai' to enable AI-powered analysis
-      # Leave as 'stub' for rule-based analysis only
-      AI_PROVIDER: stub
-      # AI_API_KEY: your-openai-api-key-here
-      AI_MODEL: gpt-4
+      # AI Provider Settings
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
     depends_on:
       internal-db:
         condition: service_healthy

@@ -3,8 +3,10 @@ Collector management endpoints.
 
 API routes for manually triggering collection and checking scheduler status.
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from datetime import datetime
 from typing import Dict, Any
+
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 
 from backend.core.logger import get_logger
 from backend.services.mysql_collector import MySQLCollector
@@ -31,6 +33,9 @@ async def collect_mysql(background_tasks: BackgroundTasks) -> Dict[str, Any]:
             logger.info("Manual MySQL collection triggered via API")
             collector = MySQLCollector()
             count = collector.collect_and_store()
+            scheduler = get_scheduler()
+            scheduler.mysql_collected_count += count
+            scheduler.last_mysql_run = datetime.utcnow()
             logger.info(f"Manual MySQL collection completed: {count} queries")
         except Exception as e:
             logger.error(f"Manual MySQL collection failed: {e}", exc_info=True)
@@ -62,6 +67,9 @@ async def collect_postgres(
             logger.info(f"Manual PostgreSQL collection triggered via API (min_duration={min_duration_ms}ms)")
             collector = PostgreSQLCollector()
             count = collector.collect_and_store(min_duration_ms=min_duration_ms)
+            scheduler = get_scheduler()
+            scheduler.postgres_collected_count += count
+            scheduler.last_postgres_run = datetime.utcnow()
             logger.info(f"Manual PostgreSQL collection completed: {count} queries")
         except Exception as e:
             logger.error(f"Manual PostgreSQL collection failed: {e}", exc_info=True)
