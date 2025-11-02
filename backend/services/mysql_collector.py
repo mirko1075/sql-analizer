@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
+from uuid import UUID
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
@@ -28,10 +29,25 @@ class MySQLCollector:
     EXPLAIN plans for slow queries.
     """
 
-    def __init__(self):
-        """Initialize MySQL collector with configuration."""
+    def __init__(
+        self,
+        database_connection_id: Optional[UUID] = None,
+        team_id: Optional[UUID] = None,
+        organization_id: Optional[UUID] = None
+    ):
+        """
+        Initialize MySQL collector with configuration.
+
+        Args:
+            database_connection_id: UUID of the database connection in the system
+            team_id: UUID of the team this collector belongs to
+            organization_id: UUID of the organization this collector belongs to
+        """
         self.config = settings.mysql_lab
         self.connection = None
+        self.database_connection_id = database_connection_id
+        self.team_id = team_id
+        self.organization_id = organization_id
 
     def connect(self) -> bool:
         """
@@ -211,6 +227,9 @@ class MySQLCollector:
 
                         # Create new record
                         slow_query = SlowQueryRaw(
+                            database_connection_id=self.database_connection_id,
+                            team_id=self.team_id,
+                            organization_id=self.organization_id,
                             source_db_type='mysql',
                             source_db_host=self.config.host,
                             source_db_name=query_record['db'] or self.config.database,

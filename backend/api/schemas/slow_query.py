@@ -35,7 +35,9 @@ class SlowQuerySummary(BaseModel):
     min_duration_ms: float = Field(..., description="Minimum execution time")
     max_duration_ms: float = Field(..., description="Maximum execution time")
     p95_duration_ms: Optional[float] = Field(None, description="95th percentile execution time")
+    first_seen: datetime = Field(..., description="First time this query pattern was seen")
     last_seen: datetime = Field(..., description="Last execution timestamp")
+    avg_efficiency_ratio: Optional[float] = Field(None, description="Average rows examined / rows returned ratio")
     has_analysis: bool = Field(..., description="Whether this query has been analyzed")
     max_improvement_level: Optional[str] = Field(None, description="Highest improvement level: LOW, MEDIUM, HIGH, CRITICAL")
 
@@ -81,9 +83,41 @@ class AnalysisResultSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AIRecommendationSchema(BaseModel):
+    """Schema for AI-generated recommendation entry."""
+    type: Optional[str] = Field(None, description="Recommendation category")
+    priority: Optional[str] = Field(None, description="Suggested priority")
+    description: Optional[str] = Field(None, description="Detailed recommendation text")
+    sql: Optional[str] = Field(None, description="SQL snippet provided by the AI")
+    estimated_impact: Optional[str] = Field(None, description="Expected impact or speedup")
+    rationale: Optional[str] = Field(None, description="Reasoning behind the recommendation")
+
+
+class AIAnalysisResultSchema(BaseModel):
+    """Schema for AI (LLM) analysis result."""
+    id: UUID
+    slow_query_id: UUID
+    provider: str
+    model: str
+    summary: str
+    root_cause: str
+    recommendations: List[AIRecommendationSchema] = Field(default_factory=list)
+    improvement_level: Optional[str] = Field(None, description="Impact level suggested by AI")
+    estimated_speedup: Optional[str] = Field(None, description="Estimated performance gain suggested by AI")
+    confidence_score: Optional[Decimal] = Field(None, description="AI confidence in results")
+    prompt_metadata: Optional[Dict[str, Any]] = None
+    provider_response: Optional[Dict[str, Any]] = None
+    analyzed_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SlowQueryWithAnalysis(SlowQueryDetail):
     """Slow query with its analysis result."""
     analysis: Optional[AnalysisResultSchema] = None
+    ai_analysis: Optional[AIAnalysisResultSchema] = None
 
     model_config = ConfigDict(from_attributes=True)
 

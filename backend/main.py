@@ -16,7 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.core.config import settings
 from backend.core.logger import get_logger
 from backend.db.session import check_db_connection, init_db
-from backend.api.routes import slow_queries, stats, collectors, analyzer
+from backend.api.routes import slow_queries, stats, collectors, analyzer, statistics, auth, database_connections, teams, users, organizations, onboarding
 from backend.services.scheduler import start_scheduler, stop_scheduler
 
 logger = get_logger(__name__)
@@ -266,10 +266,17 @@ async def root():
 
 
 # Include routers
+app.include_router(auth.router, prefix="/api/v1")  # Authentication routes
+app.include_router(users.router, prefix="/api/v1")  # User profile management
+app.include_router(organizations.router, prefix="/api/v1")  # Organization management
+app.include_router(database_connections.router, prefix="/api/v1")  # Database connections management
+app.include_router(teams.router, prefix="/api/v1")  # Team management
+app.include_router(onboarding.router, prefix="/api/v1")  # Onboarding wizard
 app.include_router(slow_queries.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
 app.include_router(collectors.router, prefix="/api/v1")
 app.include_router(analyzer.router, prefix="/api/v1")
+app.include_router(statistics.router, prefix="/api/v1")
 
 # Log registered routes on startup
 @app.on_event("startup")

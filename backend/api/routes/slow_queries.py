@@ -11,14 +11,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
 from backend.db.session import get_db
-from backend.db.models import SlowQueryRaw, AnalysisResult
+from backend.db.models import SlowQueryRaw, AnalysisResult, User, Team
 from backend.api.schemas.slow_query import (
     SlowQuerySummary,
     SlowQueryWithAnalysis,
     SlowQueryListResponse,
     ErrorResponse,
+    AIAnalysisResultSchema,
 )
 from backend.core.logger import get_logger
+from backend.core.dependencies import get_current_active_user, get_current_team, get_visible_database_connection_ids
+from backend.services.ai_analysis import analyze_query_with_ai
 
 logger = get_logger(__name__)
 
@@ -29,7 +32,7 @@ router = APIRouter(prefix="/slow-queries", tags=["Slow Queries"])
     "",
     response_model=SlowQueryListResponse,
     summary="List slow queries",
-    description="Retrieve a paginated list of slow queries grouped by fingerprint"
+    description="Retrieve a paginated list of slow queries grouped by fingerprint for the current team"
 )
 async def list_slow_queries(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
@@ -38,6 +41,9 @@ async def list_slow_queries(
     source_db_host: Optional[str] = Query(None, description="Filter by database host"),
     min_duration_ms: Optional[float] = Query(None, description="Minimum query duration in milliseconds"),
     status: Optional[str] = Query(None, description="Filter by status: NEW, ANALYZED, IGNORED, ERROR"),
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -62,14 +68,29 @@ async def list_slow_queries(
             func.min(SlowQueryRaw.duration_ms).label('min_duration_ms'),
             func.max(SlowQueryRaw.duration_ms).label('max_duration_ms'),
             func.percentile_cont(0.95).within_group(SlowQueryRaw.duration_ms).label('p95_duration_ms'),
+            func.min(SlowQueryRaw.captured_at).label('first_seen'),
             func.max(SlowQueryRaw.captured_at).label('last_seen'),
+            func.avg(
+                func.nullif(SlowQueryRaw.rows_examined, 0) /
+                func.greatest(func.nullif(SlowQueryRaw.rows_returned, 0), 1)
+            ).label('avg_efficiency_ratio'),
             func.bool_or(SlowQueryRaw.status == 'ANALYZED').label('has_analysis'),
             func.max(AnalysisResult.improvement_level).label('max_improvement_level')
         ).outerjoin(
             AnalysisResult, SlowQueryRaw.id == AnalysisResult.slow_query_id
         )
 
-        # Apply filters
+        # Filter by team (REQUIRED for multi-tenancy)
+        query = query.filter(SlowQueryRaw.team_id == current_team.id)
+
+        # Filter by visible database connections (visibility scope)
+        if visible_connection_ids:
+            query = query.filter(SlowQueryRaw.database_connection_id.in_(visible_connection_ids))
+        else:
+            # User has no visible connections - return empty result
+            return SlowQueryListResponse(items=[], total=0, page=page, page_size=page_size, total_pages=0)
+
+        # Apply additional filters
         if source_db_type:
             query = query.filter(SlowQueryRaw.source_db_type == source_db_type)
 
@@ -117,7 +138,9 @@ async def list_slow_queries(
                 min_duration_ms=float(item.min_duration_ms),
                 max_duration_ms=float(item.max_duration_ms),
                 p95_duration_ms=float(item.p95_duration_ms) if item.p95_duration_ms else None,
+                first_seen=item.first_seen,
                 last_seen=item.last_seen,
+                avg_efficiency_ratio=float(item.avg_efficiency_ratio) if item.avg_efficiency_ratio else None,
                 has_analysis=item.has_analysis,
                 max_improvement_level=item.max_improvement_level
             ))
@@ -137,6 +160,44 @@ async def list_slow_queries(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post(
+    "/{query_id}/analyze-ai",
+    response_model=AIAnalysisResultSchema,
+    summary="Run AI-assisted analysis for a slow query",
+)
+async def analyze_query_with_ai_endpoint(
+    query_id: UUID,
+    force: bool = Query(False, description="Re-run AI analysis even if cached"),
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
+    db: Session = Depends(get_db)
+):
+    """
+    Run AI-powered analysis for a specific slow query and return the generated insights.
+    """
+    try:
+        # Verify the query belongs to the current team and is from a visible database connection
+        slow_query = db.query(SlowQueryRaw).filter(
+            SlowQueryRaw.id == query_id,
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
+        ).first()
+
+        if not slow_query:
+            raise HTTPException(status_code=404, detail=f"Query with ID {query_id} not found")
+
+        result = analyze_query_with_ai(query_id, force=force)
+        return AIAnalysisResultSchema.model_validate(result)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("AI analysis failed for query %s: %s", query_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="AI analysis failed") from exc
+
+
 @router.get(
     "/{query_id}",
     response_model=SlowQueryWithAnalysis,
@@ -145,6 +206,9 @@ async def list_slow_queries(
 )
 async def get_slow_query(
     query_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -158,9 +222,11 @@ async def get_slow_query(
     - Optimization suggestions
     """
     try:
-        # Query slow query with its analysis
+        # Query slow query with its analysis, filtered by team and visible connections
         slow_query = db.query(SlowQueryRaw).filter(
-            SlowQueryRaw.id == query_id
+            SlowQueryRaw.id == query_id,
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).first()
 
         if not slow_query:
@@ -185,6 +251,9 @@ async def get_slow_query(
 async def get_queries_by_fingerprint(
     fingerprint_hash: str,
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -193,8 +262,11 @@ async def get_queries_by_fingerprint(
     Useful for analyzing how the same query pattern performs over time.
     """
     try:
+        # Filter by fingerprint, team, and visible connections
         queries = db.query(SlowQueryRaw).filter(
-            SlowQueryRaw.fingerprint == fingerprint_hash
+            SlowQueryRaw.fingerprint == fingerprint_hash,
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).order_by(desc(SlowQueryRaw.captured_at)).limit(limit).all()
 
         if not queries:
@@ -216,6 +288,9 @@ async def get_queries_by_fingerprint(
 )
 async def delete_slow_query(
     query_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    current_team: Team = Depends(get_current_team),
+    visible_connection_ids: List[UUID] = Depends(get_visible_database_connection_ids),
     db: Session = Depends(get_db)
 ):
     """
@@ -224,8 +299,11 @@ async def delete_slow_query(
     This will also cascade delete the associated analysis result.
     """
     try:
+        # Verify the query belongs to the current team and is from a visible connection before deleting
         slow_query = db.query(SlowQueryRaw).filter(
-            SlowQueryRaw.id == query_id
+            SlowQueryRaw.id == query_id,
+            SlowQueryRaw.team_id == current_team.id,
+            SlowQueryRaw.database_connection_id.in_(visible_connection_ids)
         ).first()
 
         if not slow_query:
@@ -234,7 +312,7 @@ async def delete_slow_query(
         db.delete(slow_query)
         db.commit()
 
-        logger.info(f"Deleted slow query {query_id}")
+        logger.info(f"User {current_user.email} deleted slow query {query_id} from team {current_team.name}")
 
         return {"message": f"Query {query_id} deleted successfully"}
 

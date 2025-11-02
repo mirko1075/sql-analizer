@@ -60,9 +60,9 @@ services:
 
       # Lab databases (external)
       MYSQL_HOST: host.docker.internal
-      MYSQL_PORT: 3307
+      MYSQL_PORT: 3306
       MYSQL_USER: root
-      MYSQL_PASSWORD: root
+      MYSQL_PASSWORD: admin
       MYSQL_DB: labdb
 
       PG_HOST: host.docker.internal
@@ -75,12 +75,13 @@ services:
       LOG_LEVEL: INFO
       ENV: development
 
-      # AI Provider Settings (optional)
-      # Set AI_PROVIDER to 'openai' to enable AI-powered analysis
-      # Leave as 'stub' for rule-based analysis only
-      AI_PROVIDER: stub
-      # AI_API_KEY: your-openai-api-key-here
-      AI_MODEL: gpt-4
+      # AI Provider Settings
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+
+      # Security Settings
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-7BHYHtN7_SZKavPg-p-cKBlZN708esKVqmLS9Jk2BIU=}
     depends_on:
       internal-db:
         condition: service_healthy

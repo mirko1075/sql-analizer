@@ -10,9 +10,11 @@ import type {
   AnalyzerStatus,
   HealthStatus,
   PaginatedResponse,
+  AIAnalysisResult,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Use empty string to make requests to the same origin, which nginx will proxy to backend
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -22,10 +24,32 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for logging
+// Token management
+let accessToken: string | null = null;
+
+export const setAuthToken = (token: string | null) => {
+  accessToken = token;
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+  }
+};
+
+export const getAuthToken = (): string | null => {
+  return accessToken;
+};
+
+// Request interceptor for logging and auth
 api.interceptors.request.use(
   (config) => {
     console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+    
+    // Add token if available and not already set
+    if (accessToken && !config.headers['Authorization']) {
+      config.headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
     return config;
   },
   (error) => {
@@ -38,6 +62,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('[API Error]', error.response?.data || error.message);
+    
+    // Handle 401 Unauthorized (token expired or invalid)
+    if (error.response?.status === 401) {
+      // Dispatch custom event for auth error
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -116,6 +147,7 @@ export const getUnanalyzedQueries = async (limit: number = 10): Promise<SlowQuer
   return response.data.queries;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getQueryTrends = async (days: number = 7): Promise<any> => {
   const params = new URLSearchParams({
     days: days.toString(),
@@ -165,6 +197,72 @@ export const triggerAnalysis = async (limit: number = 50): Promise<void> => {
 
 export const analyzeSpecificQuery = async (queryId: string): Promise<void> => {
   await api.post(`/api/v1/analyzer/analyze/${queryId}`);
+};
+
+export const analyzeQueryWithAI = async (
+  queryId: string,
+  options: { force?: boolean } = {}
+): Promise<AIAnalysisResult> => {
+  const params = new URLSearchParams();
+  if (options.force) {
+    params.append('force', 'true');
+  }
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/slow-queries/${queryId}/analyze-ai?${queryString}`
+    : `/api/v1/slow-queries/${queryId}/analyze-ai`;
+
+  const response = await api.post(url);
+  return response.data;
+};
+
+// ============================================================================
+// Statistics
+// ============================================================================
+
+export const getPerformanceTrends = async (params: {
+  days?: number;
+  source_db_type?: string;
+  source_db_host?: string;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params.days) queryParams.append('days', params.days.toString());
+  if (params.source_db_type) queryParams.append('source_db_type', params.source_db_type);
+  if (params.source_db_host) queryParams.append('source_db_host', params.source_db_host);
+
+  const url = `/api/v1/statistics/performance-trends${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+  const response = await api.get(url);
+  return response.data;
+};
+
+export const getQueryDistribution = async (params: {
+  limit?: number;
+  source_db_type?: string;
+  source_db_host?: string;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params.limit) queryParams.append('limit', params.limit.toString());
+  if (params.source_db_type) queryParams.append('source_db_type', params.source_db_type);
+  if (params.source_db_host) queryParams.append('source_db_host', params.source_db_host);
+
+  const url = `/api/v1/statistics/query-distribution${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+  const response = await api.get(url);
+  return response.data;
+};
+
+export const getAIInsights = async (params: {
+  limit?: number;
+  source_db_type?: string;
+  source_db_host?: string;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params.limit) queryParams.append('limit', params.limit.toString());
+  if (params.source_db_type) queryParams.append('source_db_type', params.source_db_type);
+  if (params.source_db_host) queryParams.append('source_db_host', params.source_db_host);
+
+  const url = `/api/v1/statistics/ai-insights${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+  const response = await api.get(url);
+  return response.data;
 };
 
 export default api;
