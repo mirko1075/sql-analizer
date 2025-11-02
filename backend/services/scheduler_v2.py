@@ -100,28 +100,35 @@ class TeamCollectorScheduler:
         # Import collectors here to avoid circular imports
         if conn.db_type == 'mysql':
             from backend.services.mysql_collector import MySQLCollector
-            collector = MySQLCollector()
+            # Pass connection IDs to collector
+            collector = MySQLCollector(
+                database_connection_id=conn.id,
+                team_id=conn.team_id,
+                organization_id=conn.organization_id
+            )
             # Override config with connection details
             collector.config.host = conn.host
             collector.config.port = conn.port
             collector.config.database = conn.database_name
             collector.config.user = conn.username
             collector.config.password = password
-            count = collector.collect_and_store(team_id=conn.team_id)
+            count = collector.collect_and_store()
 
         elif conn.db_type in ['postgres', 'postgresql']:
             from backend.services.postgres_collector import PostgreSQLCollector
-            collector = PostgreSQLCollector()
+            # Pass connection IDs to collector
+            collector = PostgreSQLCollector(
+                database_connection_id=conn.id,
+                team_id=conn.team_id,
+                organization_id=conn.organization_id
+            )
             # Override config with connection details
             collector.config.host = conn.host
             collector.config.port = conn.port
             collector.config.database = conn.database_name
             collector.config.user = conn.username
             collector.config.password = password
-            count = collector.collect_and_store(
-                min_duration_ms=500.0,
-                team_id=conn.team_id
-            )
+            count = collector.collect_and_store(min_duration_ms=500.0)
 
         else:
             logger.warning(

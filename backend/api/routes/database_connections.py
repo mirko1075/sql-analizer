@@ -86,7 +86,8 @@ def test_database_connection(
             )
             cursor = conn.cursor()
             cursor.execute("SELECT VERSION()")
-            version = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            version = str(result[0]) if result and isinstance(result, (list, tuple)) else None
             cursor.close()
             conn.close()
 
@@ -98,7 +99,11 @@ def test_database_connection(
             conn = psycopg2.connect(conn_string, connect_timeout=10)
             cursor = conn.cursor()
             cursor.execute("SELECT version()")
-            version = cursor.fetchone()[0].split(',')[0]  # Extract version number
+            result = cursor.fetchone()
+            if result and isinstance(result[0], str):
+                version = result[0].split(',')[0]  # Extract version number
+            else:
+                version = None
             cursor.close()
             conn.close()
 
@@ -157,9 +162,14 @@ async def list_connections(
         # Sort by name
         sorted_connections = sorted(connections, key=lambda c: c.name)
 
+        # Convert each DatabaseConnection to DatabaseConnectionResponse
+        response_connections = [
+            DatabaseConnectionResponse.from_orm(conn) for conn in sorted_connections
+        ]
+
         return DatabaseConnectionListResponse(
-            total=len(sorted_connections),
-            connections=sorted_connections
+            total=len(response_connections),
+            connections=response_connections
         )
 
     except Exception as e:
@@ -358,25 +368,26 @@ async def update_connection(
 
         # Update fields
         if request.name is not None:
-            connection.name = request.name
+            # Assign to the instance attribute, not the class variable
+            setattr(connection, "name", request.name)
         if request.host is not None:
-            connection.host = request.host
+            setattr(connection, "host", request.host)
         if request.port is not None:
-            connection.port = request.port
+            setattr(connection, "port", request.port)
         if request.database_name is not None:
-            connection.database_name = request.database_name
+            setattr(connection, "database_name", request.database_name)
         if request.username is not None:
-            connection.username = request.username
+            setattr(connection, "username", request.username)
         if request.password is not None:
-            connection.encrypted_password = encrypt_db_password(request.password)
+            setattr(connection, "encrypted_password", encrypt_db_password(request.password))
         if request.ssl_enabled is not None:
-            connection.ssl_enabled = request.ssl_enabled
+            setattr(connection, "ssl_enabled", request.ssl_enabled)
         if request.ssl_ca is not None:
-            connection.ssl_ca = request.ssl_ca
+            setattr(connection, "ssl_ca", request.ssl_ca)
         if request.visibility_scope is not None:
-            connection.visibility_scope = request.visibility_scope
+            setattr(connection, "visibility_scope", request.visibility_scope)
         if request.is_active is not None:
-            connection.is_active = request.is_active
+            setattr(connection, "is_active", request.is_active)
 
         db.commit()
         db.refresh(connection)
@@ -510,6 +521,11 @@ async def test_existing_connection(
     Decrypts the stored password and attempts to connect.
     Updates last_connected_at on success.
     """
+    print(f"Testing connection: {connection_id}")
+    print(f"Current team: {current_team.id}")
+    print(f"Current user: {current_user.id}")
+    print(f"DB Session: {db}")
+
     try:
         connection = db.query(DatabaseConnection).filter(
             DatabaseConnection.id == connection_id,
@@ -523,22 +539,22 @@ async def test_existing_connection(
             )
 
         # Decrypt password
-        decrypted_password = decrypt_db_password(connection.encrypted_password)
+        decrypted_password = decrypt_db_password(str(connection.encrypted_password))
 
         # Test connection
         result = test_database_connection(
-            db_type=connection.db_type,
-            host=connection.host,
-            port=connection.port,
-            database_name=connection.database_name,
-            username=connection.username,
+            db_type=str(connection.db_type),
+            host=str(connection.host),
+            port=getattr(connection, "port"),
+            database_name=str(connection.database_name),
+            username=str(connection.username),
             password=decrypted_password,
-            ssl_enabled=connection.ssl_enabled
+            ssl_enabled=getattr(connection, "ssl_enabled")
         )
 
         # Update last_connected_at if successful
         if result.success:
-            connection.last_connected_at = datetime.utcnow()
+            setattr(connection, "last_connected_at", datetime.utcnow())
             db.commit()
 
         return result
@@ -651,7 +667,7 @@ async def get_agent_token(
                 detail="Database connection not found"
             )
 
-        if not connection.agent_token:
+        if not str(connection.agent_token):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No agent token found for this connection"
@@ -663,7 +679,7 @@ async def get_agent_token(
 
         return {
             "agent_token": connection.agent_token,
-            "created_at": connection.agent_token_created_at.isoformat() if connection.agent_token_created_at else None,
+            "created_at": connection.agent_token_created_at.isoformat() if str(connection.agent_token_created_at) else None,
             "connection_name": connection.name
         }
 

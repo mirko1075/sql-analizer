@@ -60,9 +60,9 @@ services:
 
       # Lab databases (external)
       MYSQL_HOST: host.docker.internal
-      MYSQL_PORT: 3307
+      MYSQL_PORT: 3306
       MYSQL_USER: root
-      MYSQL_PASSWORD: root
+      MYSQL_PASSWORD: admin
       MYSQL_DB: labdb
 
       PG_HOST: host.docker.internal
