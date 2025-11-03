@@ -19,13 +19,15 @@ class Settings:
     mysql_port: int = int(os.getenv("MYSQL_PORT", "3306"))
     mysql_user: str = os.getenv("MYSQL_USER", "root")
     mysql_password: str = os.getenv("MYSQL_PASSWORD", "root")
-    mysql_db: str = os.getenv("MYSQL_DB", "labdb")
+    mysql_db: str = os.getenv("MYSQL_DB", "")  # Empty = monitor all databases
+    mysql_database: str = os.getenv("MYSQL_DB", "")  # Alias for compatibility
     
     # AI Configuration
     ai_base_url: str = os.getenv("AI_BASE_URL", "http://ai-llama:11434")
     ai_model: str = os.getenv("AI_MODEL", "llama3.1:8b")
     
     # Application Settings
+    api_port: int = int(os.getenv("API_PORT", "8000"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     collection_interval: int = int(os.getenv("COLLECTION_INTERVAL", "60"))
     
@@ -35,13 +37,16 @@ class Settings:
     
     def get_mysql_dict(self) -> dict:
         """Get MySQL connection parameters as dictionary."""
-        return {
+        params = {
             "host": self.mysql_host,
             "port": self.mysql_port,
             "user": self.mysql_user,
             "password": self.mysql_password,
-            "database": self.mysql_db
         }
+        # Only add database if specified
+        if self.mysql_db:
+            params["database"] = self.mysql_db
+        return params
 
 
 # Global settings instance

@@ -137,7 +137,7 @@ export default function QueryDetail() {
           {/* Issues Found */}
           <div className="card">
             <h2>⚠️ Issues Found</h2>
-            {analysis.issues.length === 0 ? (
+            {analysis.issues?.length === 0 ? (
               <p>No major issues detected. This query looks good!</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -169,7 +169,7 @@ export default function QueryDetail() {
           </div>
 
           {/* Suggested Indexes */}
-          {analysis.suggested_indexes.length > 0 && (
+          {analysis.suggested_indexes?.length > 0 && (
             <div className="card">
               <h2>💡 Suggested Indexes</h2>
               {analysis.suggested_indexes.map((index, idx) => (

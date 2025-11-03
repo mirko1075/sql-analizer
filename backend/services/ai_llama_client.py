@@ -6,25 +6,40 @@ import requests
 import json
 from typing import Optional, Dict, Any
 
-from backend.core.config import settings
-from backend.core.logger import setup_logger
+from core.config import settings
+from core.logger import setup_logger
 
 logger = setup_logger(__name__, settings.log_level)
 
 
-def check_llama_health() -> bool:
+def check_llama_health() -> Dict[str, Any]:
     """
     Check if LLaMA/Ollama service is available.
     
     Returns:
-        True if service is healthy, False otherwise
+        Dictionary with status and models count
     """
     try:
         response = requests.get(f"{settings.ai_base_url}/api/tags", timeout=5)
-        return response.status_code == 200
+        if response.status_code == 200:
+            models = response.json().get("models", [])
+            return {
+                "status": "healthy",
+                "models": len(models),
+                "message": f"{len(models)} models available"
+            }
+        return {
+            "status": "unhealthy",
+            "models": 0,
+            "message": f"HTTP {response.status_code}"
+        }
     except Exception as e:
         logger.warning(f"LLaMA service not available: {e}")
-        return False
+        return {
+            "status": "unhealthy",
+            "models": 0,
+            "message": str(e)
+        }
 
 
 def ensure_model_loaded() -> bool:

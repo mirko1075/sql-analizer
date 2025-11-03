@@ -6,12 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from contextlib import asynccontextmanager
 
-from backend.core.config import settings
-from backend.core.logger import setup_logger
-from backend.db.models import init_db
-from backend.services.collector import collect_slow_queries
-from backend.services.ai_llama_client import ensure_model_loaded, check_llama_health
-from backend.api.routes import slow_queries, analyze
+from core.config import settings
+from core.logger import setup_logger
+from db.models import init_db
+from services.collector import collect_slow_queries
+from services.ai_llama_client import ensure_model_loaded, check_llama_health
+from api.routes import slow_queries, analyze, stats
 
 logger = setup_logger(__name__, settings.log_level)
 
@@ -96,6 +96,7 @@ app.add_middleware(
 # Include routers
 app.include_router(slow_queries.router)
 app.include_router(analyze.router)
+app.include_router(stats.router)
 
 
 @app.get("/")

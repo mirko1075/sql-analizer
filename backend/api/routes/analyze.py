@@ -4,10 +4,10 @@ Analysis API Routes.
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import Dict, Any
 
-from backend.services.analyzer import analyze_query, get_analysis_result
-from backend.services.collector import collect_slow_queries
-from backend.core.logger import setup_logger
-from backend.core.config import settings
+from services.analyzer import analyze_query, get_analysis_result
+from services.collector import collect_slow_queries
+from core.logger import setup_logger
+from core.config import settings
 
 logger = setup_logger(__name__, settings.log_level)
 

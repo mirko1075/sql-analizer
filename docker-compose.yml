@@ -38,22 +38,24 @@ services:
       dockerfile: Dockerfile
     container_name: dbpower-backend
     restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
     environment:
-      # MySQL to monitor
-      MYSQL_HOST: mysql-lab
-      MYSQL_PORT: 3306
-      MYSQL_USER: root
-      MYSQL_PASSWORD: root
-      MYSQL_DB: labdb
+      # MySQL to monitor - from .env
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_PORT: ${MYSQL_PORT}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DB: ${MYSQL_DB}
       
-      # AI LLaMA connection
-      AI_BASE_URL: http://ai-llama:11434
-      AI_MODEL: llama3.1:8b
+      # AI LLaMA connection - from .env
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_MODEL: ${AI_MODEL}
       
-      # App settings
-      LOG_LEVEL: INFO
-    ports:
-      - "8000:8000"
+      # App settings - from .env
+      LOG_LEVEL: ${LOG_LEVEL}
+      COLLECTION_INTERVAL: ${COLLECTION_INTERVAL}
     depends_on:
       mysql-lab:
         condition: service_healthy
@@ -62,10 +64,8 @@ services:
     volumes:
       - ./backend:/app
       - ./data/cache:/app/cache
-    networks:
-      - dbpower-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -84,7 +84,7 @@ services:
     networks:
       - dbpower-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:11434/api/tags || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -97,14 +97,11 @@ services:
       dockerfile: Dockerfile
     container_name: dbpower-frontend
     restart: unless-stopped
-    ports:
-      - "3000:80"
+    network_mode: host
     depends_on:
       - backend
-    networks:
-      - dbpower-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

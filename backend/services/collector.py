@@ -7,9 +7,9 @@ import hashlib
 from datetime import datetime
 from typing import List, Dict, Any
 
-from backend.core.config import settings
-from backend.core.logger import setup_logger
-from backend.db.models import SlowQuery, get_db
+from core.config import settings
+from core.logger import setup_logger
+from db.models import SlowQuery, get_db
 
 logger = setup_logger(__name__, settings.log_level)
 
@@ -30,12 +30,12 @@ def generate_fingerprint(sql: str) -> str:
     return hashlib.md5(normalized.encode()).hexdigest()
 
 
-def collect_slow_queries() -> int:
+def collect_slow_queries() -> Dict[str, Any]:
     """
     Collect slow queries from MySQL slow_log table.
     
     Returns:
-        Number of new queries collected
+        Dictionary with collection result
     """
     logger.info("Starting slow query collection from MySQL...")
     
@@ -80,11 +80,15 @@ def collect_slow_queries() -> int:
             if not sql_text or len(sql_text.strip()) == 0:
                 continue
             
+            # Convert timedelta to float seconds
+            query_time_seconds = row['query_time'].total_seconds() if hasattr(row['query_time'], 'total_seconds') else float(row['query_time'])
+            lock_time_seconds = row['lock_time'].total_seconds() if (row['lock_time'] and hasattr(row['lock_time'], 'total_seconds')) else (float(row['lock_time']) if row['lock_time'] else 0.0)
+            
             slow_query = SlowQuery(
                 sql_text=sql_text,
                 sql_fingerprint=generate_fingerprint(sql_text),
-                query_time=float(row['query_time']),
-                lock_time=float(row['lock_time']) if row['lock_time'] else 0.0,
+                query_time=query_time_seconds,
+                lock_time=lock_time_seconds,
                 rows_sent=int(row['rows_sent']) if row['rows_sent'] else 0,
                 rows_examined=int(row['rows_examined']) if row['rows_examined'] else 0,
                 database_name=row['db'],
@@ -101,11 +105,17 @@ def collect_slow_queries() -> int:
         conn.close()
         
         logger.info(f"Successfully collected {collected_count} slow queries")
-        return collected_count
+        return {
+            "collected": collected_count,
+            "message": f"Successfully collected {collected_count} slow queries"
+        }
         
     except Exception as e:
         logger.error(f"Error collecting slow queries: {e}", exc_info=True)
-        return 0
+        return {
+            "collected": 0,
+            "message": f"Error: {str(e)}"
+        }
 
 
 def get_pending_queries(limit: int = 10) -> List[Dict[str, Any]]:

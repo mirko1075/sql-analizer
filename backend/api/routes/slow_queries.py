@@ -5,10 +5,10 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from backend.db.models import SlowQuery, get_db
-from backend.services.collector import get_all_queries, get_pending_queries
-from backend.core.logger import setup_logger
-from backend.core.config import settings
+from db.models import SlowQuery, get_db
+from services.collector import get_all_queries, get_pending_queries
+from core.logger import setup_logger
+from core.config import settings
 
 logger = setup_logger(__name__, settings.log_level)
 
@@ -45,7 +45,7 @@ async def list_slow_queries(
         total = query.count()
         
         # Apply pagination
-        queries = query.order_by(SlowQuery.detected_at.desc()).offset(skip).limit(limit).all()
+        queries = query.order_by(SlowQuery.collected_at.desc()).offset(skip).limit(limit).all()
         
         # Format response
         queries_data = []
@@ -59,7 +59,7 @@ async def list_slow_queries(
                 "rows_sent": q.rows_sent,
                 "database_name": q.database_name,
                 "analyzed": q.analyzed,
-                "detected_at": q.detected_at.isoformat() if q.detected_at else None
+                "detected_at": q.collected_at.isoformat() if q.collected_at else None
             })
         
         return {
@@ -106,7 +106,7 @@ async def get_slow_query(query_id: int) -> Dict[str, Any]:
             "user_host": slow_query.user_host,
             "analyzed": slow_query.analyzed,
             "analysis_result_id": slow_query.analysis_result_id,
-            "detected_at": slow_query.detected_at.isoformat() if slow_query.detected_at else None
+            "detected_at": slow_query.collected_at.isoformat() if slow_query.collected_at else None
         }
         
     except HTTPException:

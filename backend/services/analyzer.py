@@ -7,10 +7,10 @@ import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from backend.core.config import settings
-from backend.core.logger import setup_logger
-from backend.db.models import SlowQuery, AnalysisResult, get_db
-from backend.services.ai_llama_client import analyze_with_llama
+from core.config import settings
+from core.logger import setup_logger
+from db.models import SlowQuery, AnalysisResult, get_db
+from services.ai_llama_client import analyze_with_llama
 
 logger = setup_logger(__name__, settings.log_level)
 
