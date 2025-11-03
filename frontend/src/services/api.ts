@@ -19,6 +19,8 @@ export interface SlowQuery {
   database_name: string;
   analyzed: boolean;
   detected_at: string;
+  lock_time: number | null;
+  analyzed_at?: string | null;
 }
 
 export interface Issue {
