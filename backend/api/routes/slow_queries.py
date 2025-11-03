@@ -1,246 +1,155 @@
 """
-API routes for slow query management.
-
-Provides endpoints to list, retrieve, and manage slow queries.
+Slow Queries API Routes.
 """
-from typing import List, Optional
-from uuid import UUID
+from fastapi import APIRouter, HTTPException, Query
+from typing import List, Dict, Any, Optional
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from backend.db.models import SlowQuery, get_db
+from backend.services.collector import get_all_queries, get_pending_queries
+from backend.core.logger import setup_logger
+from backend.core.config import settings
 
-from backend.db.session import get_db
-from backend.db.models import SlowQueryRaw, AnalysisResult
-from backend.api.schemas.slow_query import (
-    SlowQuerySummary,
-    SlowQueryWithAnalysis,
-    SlowQueryListResponse,
-    ErrorResponse,
-)
-from backend.core.logger import get_logger
+logger = setup_logger(__name__, settings.log_level)
 
-logger = get_logger(__name__)
-
-router = APIRouter(prefix="/slow-queries", tags=["Slow Queries"])
+router = APIRouter(prefix="/api/v1/slow-queries", tags=["slow-queries"])
 
 
-@router.get(
-    "",
-    response_model=SlowQueryListResponse,
-    summary="List slow queries",
-    description="Retrieve a paginated list of slow queries grouped by fingerprint"
-)
+@router.get("")
 async def list_slow_queries(
-    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    source_db_type: Optional[str] = Query(None, description="Filter by database type"),
-    source_db_host: Optional[str] = Query(None, description="Filter by database host"),
-    min_duration_ms: Optional[float] = Query(None, description="Minimum query duration in milliseconds"),
-    status: Optional[str] = Query(None, description="Filter by status: NEW, ANALYZED, IGNORED, ERROR"),
-    db: Session = Depends(get_db)
-):
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    analyzed: Optional[bool] = None
+) -> Dict[str, Any]:
     """
-    Get a list of slow queries grouped by fingerprint.
-
-    Returns aggregated statistics for each unique query pattern including:
-    - Execution count
-    - Average, min, max execution times
-    - Analysis status
+    List all collected slow queries with pagination.
+    
+    Query Parameters:
+        skip: Number of records to skip (default: 0)
+        limit: Number of records to return (default: 50, max: 500)
+        analyzed: Filter by analyzed status (optional)
+    
+    Returns:
+        Dictionary with queries list and pagination info
     """
     try:
-        # Subquery to get the most recent query ID for each fingerprint group
-        from sqlalchemy import lateral
-
-        # Build base query using the query_performance_summary view
-        query = db.query(
-            SlowQueryRaw.fingerprint,
-            SlowQueryRaw.source_db_type,
-            SlowQueryRaw.source_db_host,
-            func.count(SlowQueryRaw.id).label('execution_count'),
-            func.avg(SlowQueryRaw.duration_ms).label('avg_duration_ms'),
-            func.min(SlowQueryRaw.duration_ms).label('min_duration_ms'),
-            func.max(SlowQueryRaw.duration_ms).label('max_duration_ms'),
-            func.percentile_cont(0.95).within_group(SlowQueryRaw.duration_ms).label('p95_duration_ms'),
-            func.max(SlowQueryRaw.captured_at).label('last_seen'),
-            func.bool_or(SlowQueryRaw.status == 'ANALYZED').label('has_analysis'),
-            func.max(AnalysisResult.improvement_level).label('max_improvement_level')
-        ).outerjoin(
-            AnalysisResult, SlowQueryRaw.id == AnalysisResult.slow_query_id
-        )
-
-        # Apply filters
-        if source_db_type:
-            query = query.filter(SlowQueryRaw.source_db_type == source_db_type)
-
-        if source_db_host:
-            query = query.filter(SlowQueryRaw.source_db_host == source_db_host)
-
-        if min_duration_ms:
-            query = query.having(func.avg(SlowQueryRaw.duration_ms) >= min_duration_ms)
-
-        if status:
-            query = query.filter(SlowQueryRaw.status == status)
-
-        # Group by fingerprint and source
-        query = query.group_by(
-            SlowQueryRaw.fingerprint,
-            SlowQueryRaw.source_db_type,
-            SlowQueryRaw.source_db_host
-        )
-
+        db = next(get_db())
+        
+        # Build query
+        query = db.query(SlowQuery)
+        
+        if analyzed is not None:
+            query = query.filter(SlowQuery.analyzed == analyzed)
+        
         # Get total count
         total = query.count()
-
+        
         # Apply pagination
-        offset = (page - 1) * page_size
-        items = query.order_by(desc('avg_duration_ms')).offset(offset).limit(page_size).all()
-
-        # Convert to response model
-        # For each grouped result, get the most recent query ID
-        summaries = []
-        for item in items:
-            # Get the most recent query ID for this fingerprint group
-            representative_query = db.query(SlowQueryRaw.id).filter(
-                SlowQueryRaw.fingerprint == item.fingerprint,
-                SlowQueryRaw.source_db_type == item.source_db_type,
-                SlowQueryRaw.source_db_host == item.source_db_host
-            ).order_by(desc(SlowQueryRaw.captured_at)).first()
-
-            summaries.append(SlowQuerySummary(
-                id=str(representative_query.id) if representative_query else "",
-                fingerprint=item.fingerprint,
-                source_db_type=item.source_db_type,
-                source_db_host=item.source_db_host,
-                execution_count=item.execution_count,
-                avg_duration_ms=float(item.avg_duration_ms),
-                min_duration_ms=float(item.min_duration_ms),
-                max_duration_ms=float(item.max_duration_ms),
-                p95_duration_ms=float(item.p95_duration_ms) if item.p95_duration_ms else None,
-                last_seen=item.last_seen,
-                has_analysis=item.has_analysis,
-                max_improvement_level=item.max_improvement_level
-            ))
-
-        total_pages = (total + page_size - 1) // page_size
-
-        return SlowQueryListResponse(
-            items=summaries,
-            total=total,
-            page=page,
-            page_size=page_size,
-            total_pages=total_pages
-        )
-
+        queries = query.order_by(SlowQuery.detected_at.desc()).offset(skip).limit(limit).all()
+        
+        # Format response
+        queries_data = []
+        for q in queries:
+            queries_data.append({
+                "id": q.id,
+                "sql_fingerprint": q.sql_fingerprint,
+                "sql_text": q.sql_text[:200] + "..." if len(q.sql_text) > 200 else q.sql_text,  # Truncate for list view
+                "query_time": q.query_time,
+                "rows_examined": q.rows_examined,
+                "rows_sent": q.rows_sent,
+                "database_name": q.database_name,
+                "analyzed": q.analyzed,
+                "detected_at": q.detected_at.isoformat() if q.detected_at else None
+            })
+        
+        return {
+            "queries": queries_data,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "has_more": (skip + limit) < total
+        }
+        
     except Exception as e:
-        logger.error(f"Error listing slow queries: {e}")
+        logger.error(f"Error listing slow queries: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
-    "/{query_id}",
-    response_model=SlowQueryWithAnalysis,
-    summary="Get slow query details",
-    description="Retrieve detailed information about a specific slow query including analysis"
-)
-async def get_slow_query(
-    query_id: UUID,
-    db: Session = Depends(get_db)
-):
+@router.get("/{query_id}")
+async def get_slow_query(query_id: int) -> Dict[str, Any]:
     """
-    Get detailed information about a specific slow query.
-
+    Get details of a specific slow query.
+    
+    Path Parameters:
+        query_id: ID of the slow query
+    
     Returns:
-    - Full SQL query
-    - Execution plan (JSON and text)
-    - Performance metrics
-    - Analysis results (if available)
-    - Optimization suggestions
+        Slow query details with full SQL text
     """
     try:
-        # Query slow query with its analysis
-        slow_query = db.query(SlowQueryRaw).filter(
-            SlowQueryRaw.id == query_id
-        ).first()
-
+        db = next(get_db())
+        
+        slow_query = db.query(SlowQuery).filter(SlowQuery.id == query_id).first()
+        
         if not slow_query:
             raise HTTPException(status_code=404, detail=f"Query with ID {query_id} not found")
-
-        # Convert to response model (relationships are loaded automatically)
-        return SlowQueryWithAnalysis.model_validate(slow_query)
-
+        
+        return {
+            "id": slow_query.id,
+            "sql_fingerprint": slow_query.sql_fingerprint,
+            "sql_text": slow_query.sql_text,
+            "query_time": slow_query.query_time,
+            "lock_time": slow_query.lock_time,
+            "rows_examined": slow_query.rows_examined,
+            "rows_sent": slow_query.rows_sent,
+            "database_name": slow_query.database_name,
+            "user_host": slow_query.user_host,
+            "analyzed": slow_query.analyzed,
+            "analysis_result_id": slow_query.analysis_result_id,
+            "detected_at": slow_query.detected_at.isoformat() if slow_query.detected_at else None
+        }
+        
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving query {query_id}: {e}")
+        logger.error(f"Error getting slow query {query_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
-    "/fingerprint/{fingerprint_hash}",
-    response_model=List[SlowQueryWithAnalysis],
-    summary="Get queries by fingerprint",
-    description="Retrieve all executions of queries matching a specific fingerprint"
-)
-async def get_queries_by_fingerprint(
-    fingerprint_hash: str,
-    limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
-    db: Session = Depends(get_db)
-):
+@router.get("/stats/summary")
+async def get_summary_stats() -> Dict[str, Any]:
     """
-    Get all executions of queries matching a fingerprint.
-
-    Useful for analyzing how the same query pattern performs over time.
+    Get summary statistics for slow queries.
+    
+    Returns:
+        Dictionary with various statistics
     """
     try:
-        queries = db.query(SlowQueryRaw).filter(
-            SlowQueryRaw.fingerprint == fingerprint_hash
-        ).order_by(desc(SlowQueryRaw.captured_at)).limit(limit).all()
-
-        if not queries:
-            raise HTTPException(status_code=404, detail=f"No queries found with fingerprint: {fingerprint_hash}")
-
-        return [SlowQueryWithAnalysis.model_validate(q) for q in queries]
-
-    except HTTPException:
-        raise
+        db = next(get_db())
+        
+        total_queries = db.query(SlowQuery).count()
+        analyzed_queries = db.query(SlowQuery).filter(SlowQuery.analyzed == True).count()
+        pending_queries = db.query(SlowQuery).filter(SlowQuery.analyzed == False).count()
+        
+        # Average query time
+        from sqlalchemy import func
+        avg_query_time = db.query(func.avg(SlowQuery.query_time)).scalar() or 0.0
+        
+        # Slowest query
+        slowest = db.query(SlowQuery).order_by(SlowQuery.query_time.desc()).first()
+        
+        return {
+            "total_queries": total_queries,
+            "analyzed_queries": analyzed_queries,
+            "pending_queries": pending_queries,
+            "average_query_time": round(avg_query_time, 3),
+            "slowest_query": {
+                "id": slowest.id,
+                "query_time": slowest.query_time,
+                "sql_text": slowest.sql_text[:100] + "..." if slowest and len(slowest.sql_text) > 100 else (slowest.sql_text if slowest else None)
+            } if slowest else None
+        }
+        
     except Exception as e:
-        logger.error(f"Error retrieving queries by fingerprint: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.delete(
-    "/{query_id}",
-    summary="Delete slow query",
-    description="Delete a slow query record and its analysis"
-)
-async def delete_slow_query(
-    query_id: UUID,
-    db: Session = Depends(get_db)
-):
-    """
-    Delete a slow query record.
-
-    This will also cascade delete the associated analysis result.
-    """
-    try:
-        slow_query = db.query(SlowQueryRaw).filter(
-            SlowQueryRaw.id == query_id
-        ).first()
-
-        if not slow_query:
-            raise HTTPException(status_code=404, detail=f"Query with ID {query_id} not found")
-
-        db.delete(slow_query)
-        db.commit()
-
-        logger.info(f"Deleted slow query {query_id}")
-
-        return {"message": f"Query {query_id} deleted successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting query {query_id}: {e}")
-        db.rollback()
+        logger.error(f"Error getting summary stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,635 +1,322 @@
-# AI Query Analyzer
+# 🧠 DBPower Base - LLaMA Edition
 
-Enterprise-grade slow query analysis platform that automatically collects, analyzes, and provides optimization recommendations for MySQL and PostgreSQL databases.
+**AI-Powered MySQL Query Analyzer with Local LLaMA Model**
 
-## Overview
+A simplified, on-premise solution for monitoring and analyzing slow MySQL queries using rule-based detection combined with local LLaMA AI (no external API calls required).
 
-AI Query Analyzer is a comprehensive solution for identifying and optimizing slow database queries. It combines automated query collection, rule-based analysis, and AI-ready infrastructure to help database administrators and developers improve query performance.
+---
 
-### Key Features
+## ✨ Features
 
-- **Automatic Query Collection**: Monitors MySQL and PostgreSQL databases for slow queries
-- **Intelligent Analysis**: Rule-based query analysis with AI integration capability
-- **Modern Dashboard**: React-based UI with real-time statistics and insights
-- **Production Ready**: Docker-based deployment with health checks and monitoring
-- **Multi-Database Support**: Works with both MySQL and PostgreSQL
-- **Query Fingerprinting**: Normalizes queries to identify patterns
-- **EXPLAIN Plan Analysis**: Automatic execution plan analysis for optimization hints
+- 🔍 **Real-time Slow Query Detection** - Monitors MySQL `slow_log` table
+- 📊 **Smart Analysis** - Combines rule-based checks with AI insights
+- 🧠 **Local AI with LLaMA** - Uses Ollama for on-premise AI analysis (no OpenAI/Claude)
+- 💡 **Index Suggestions** - Automatically recommends missing indexes
+- 🚀 **Easy Deployment** - Everything runs in Docker Compose
+- 🎯 **No Authentication** - Simple internal tool (add auth if needed)
+- 📈 **Performance Metrics** - Track query time, rows examined, efficiency ratios
 
-## Architecture
+---
+
+## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         AI Query Analyzer                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌──────────────┐    ┌──────────────┐    ┌─────────────────┐   │
-│  │   Frontend   │───▶│   Backend    │───▶│  Internal DB    │   │
-│  │  React + TS  │    │   FastAPI    │    │  PostgreSQL 15  │   │
-│  │  (Port 3000) │    │  (Port 8000) │    │   (Port 5440)   │   │
-│  └──────────────┘    └──────┬───────┘    └─────────────────┘   │
-│                              │                                    │
-│                              │            ┌─────────────────┐   │
-│                              └───────────▶│     Redis       │   │
-│                                            │  Cache + Queue  │   │
-│                                            └─────────────────┘   │
-│                                                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Scheduler (APScheduler)                      │  │
-│  │  ┌─────────────────┐    ┌─────────────────────────┐     │  │
-│  │  │ MySQL Collector │    │ PostgreSQL Collector    │     │  │
-│  │  │  (Every 5 min)  │    │     (Every 5 min)       │     │  │
-│  │  └────────┬────────┘    └──────────┬──────────────┘     │  │
-│  │           │                         │                     │  │
-│  │           └──────────┬──────────────┘                     │  │
-│  │                      ▼                                     │  │
-│  │           ┌─────────────────────┐                         │  │
-│  │           │   Query Analyzer    │                         │  │
-│  │           │   (Every 10 min)    │                         │  │
-│  │           └─────────────────────┘                         │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-        ┌───────────────────────────────────────────┐
-        │         External Lab Databases             │
-        │  ┌──────────────┐    ┌─────────────────┐  │
-        │  │ MySQL Lab    │    │ PostgreSQL Lab  │  │
-        │  │ (Port 3307)  │    │   (Port 5433)   │  │
-        │  └──────────────┘    └─────────────────┘  │
-        └───────────────────────────────────────────┘
+┌─────────────┐
+│   Frontend  │ (React + Vite)
+│   Port 3000 │
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│   Backend   │ (FastAPI)
+│   Port 8000 │
+└──┬───────┬──┘
+   │       │
+   │   ┌───▼────────┐
+   │   │  AI LLaMA  │ (Ollama)
+   │   │ Port 11434 │
+   │   └────────────┘
+   │
+┌──▼──────────┐
+│  MySQL Lab  │ (Test Database)
+│  Port 3307  │
+└─────────────┘
 ```
 
-## Quick Start
+**Components:**
+- **mysql-lab**: MySQL 8.0 with slow query logging enabled
+- **backend**: FastAPI app (collector + analyzer + API)
+- **ai-llama**: Ollama container with LLaMA 3.1:8b model
+- **frontend**: React dashboard to view and analyze queries
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Docker 20.10+
-- Docker Compose 2.0+
+- Docker & Docker Compose
+- ~8GB disk space (for LLaMA model)
 - 4GB RAM minimum
-- 10GB disk space
 
-### Start in Development Mode
+### Installation
 
+1. **Clone or copy this project:**
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd sql-analizer
-
-# Make startup script executable
-chmod +x start.sh
-
-# Start all services (lab databases + application)
-./start.sh dev
+cd dbpower-base
 ```
 
-After ~30 seconds, access:
-- **Frontend**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:8000](http://localhost:8000)
-- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **MySQL Lab**: `localhost:3307` (user: root, password: root)
-- **PostgreSQL Lab**: `localhost:5433` (user: postgres, password: postgres)
-
-### Start in Production Mode
-
+2. **Create `.env` file** (copy from `.env.example`):
 ```bash
-# Copy and configure production environment
-cp .env.prod.example .env.prod
-nano .env.prod  # Edit with your production values
-
-# Start in production mode
-./start.sh prod
+cp .env.example .env
 ```
 
-Production access:
-- **Frontend**: [http://localhost:80](http://localhost:80)
-- **Backend API**: [http://localhost:8000](http://localhost:8000)
-
-### Other Commands
-
+3. **Start everything:**
 ```bash
-# Start only lab databases
-./start.sh lab
-
-# Stop all services
-./start.sh stop
-
-# Clean up everything (removes data!)
-./start.sh clean
-
-# View logs
-./start.sh logs
-```
-
-## 📚 Documentation
-
-For comprehensive guides, see:
-
-- **[🚀 Environment Setup Guide](ENVIRONMENT_GUIDE.md)** - Complete environment setup and verification
-- **[🧪 Testing Guide](TESTING_GUIDE.md)** - How to run performance tests and interpret results
-- **[📖 Test Catalog](ai-query-lab/tests/README_TESTS.md)** - Complete catalog of all 38 test cases
-
-### Quick Links
-- Run all performance tests: `cd ai-query-lab/tests && ./run_tests.sh all`
-- Run MySQL tests only: `./run_tests.sh mysql`
-- Run specific category: `./run_tests.sh mysql SCAN`
-- Run single test: `./run_tests.sh mysql --single SCAN-001`
-
-## Installation
-
-### Manual Installation (Development)
-
-#### 1. Start Lab Databases
-
-```bash
-cd ai-query-lab
 docker compose up -d
-cd ..
 ```
 
-#### 2. Setup Backend
+**First startup will take 5-10 minutes** to download the LLaMA model (~5GB).
+
+4. **Check logs:**
+```bash
+# Watch backend logs (shows when AI model is ready)
+docker compose logs -f backend
+
+# You should see: "✅ Model ready for analysis"
+```
+
+5. **Access the dashboard:**
+```
+http://localhost:3000
+```
+
+---
+
+## 📚 Usage
+
+### 1. Load Demo Data
+The `mysql-lab` container automatically loads demo data on first startup:
+- 10,000 users
+- 50,000 orders
+- 1,000 products
+- **Intentionally missing indexes** to generate slow queries
+
+### 2. Generate Slow Queries
+Run the simulator inside the MySQL container:
 
 ```bash
-cd backend
+# Enter the mysql-lab container
+docker compose exec mysql-lab bash
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# Install Python (needed for simulator)
+apt-get update && apt-get install -y python3 python3-pip
+pip3 install mysql-connector-python
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment variables
-export INTERNAL_DB_HOST=localhost
-export INTERNAL_DB_PORT=5440
-export INTERNAL_DB_USER=ai_core
-export INTERNAL_DB_PASSWORD=ai_core_pass
-export INTERNAL_DB_NAME=ai_core
-
-export REDIS_HOST=localhost
-export REDIS_PORT=6379
-
-export MYSQL_HOST=localhost
-export MYSQL_PORT=3307
-export MYSQL_USER=root
-export MYSQL_PASSWORD=root
-
-export PG_HOST=localhost
-export PG_PORT=5433
-export PG_USER=postgres
-export PG_PASSWORD=postgres
-
-# Run backend
-uvicorn backend.main:app --reload
+# Run the simulator
+python3 /docker-entrypoint-initdb.d/simulate_slow_queries.py
 ```
 
-#### 3. Setup Frontend
+The simulator will continuously run slow queries to populate the `slow_log` table.
 
-```bash
-cd frontend
+### 3. View & Analyze Queries
 
-# Install dependencies
-npm install
+1. Open **http://localhost:3000**
+2. Click **"🔄 Collect Now"** to import slow queries from MySQL
+3. Click on any query to see details
+4. Click **"🚀 Analyze with LLaMA AI"** to get AI-powered insights
 
-# Start development server
-npm run dev
+---
+
+## 🔧 Configuration
+
+Edit `.env` file:
+
+```env
+# MySQL Configuration
+MYSQL_HOST=mysql-lab
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=rootpassword
+MYSQL_DATABASE=labdb
+
+# AI Configuration
+AI_BASE_URL=http://ai-llama:11434
+AI_MODEL=llama3.1:8b
+
+# Backend Settings
+API_PORT=8000
+LOG_LEVEL=INFO
+COLLECTION_INTERVAL=300  # seconds (5 minutes)
 ```
 
-### Docker Installation (Recommended)
+### Change LLaMA Model
 
-Use the provided [start.sh](start.sh) script for automated Docker deployment.
+To use a different model:
+1. Edit `.env`: `AI_MODEL=llama3.2:latest`
+2. Restart: `docker compose restart backend`
+3. The new model will be pulled automatically
 
-## Configuration
+Available models: https://ollama.ai/library
 
-### Environment Variables
+---
 
-#### Backend Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `INTERNAL_DB_HOST` | Internal PostgreSQL host | `internal-db` |
-| `INTERNAL_DB_PORT` | Internal PostgreSQL port | `5432` |
-| `INTERNAL_DB_USER` | Internal database user | `ai_core` |
-| `INTERNAL_DB_PASSWORD` | Internal database password | `ai_core_pass` |
-| `INTERNAL_DB_NAME` | Internal database name | `ai_core` |
-| `REDIS_HOST` | Redis host | `redis` |
-| `REDIS_PORT` | Redis port | `6379` |
-| `REDIS_PASSWORD` | Redis password | (none) |
-| `MYSQL_HOST` | MySQL lab host | `localhost` |
-| `MYSQL_PORT` | MySQL lab port | `3307` |
-| `MYSQL_USER` | MySQL lab user | `root` |
-| `MYSQL_PASSWORD` | MySQL lab password | `root` |
-| `PG_HOST` | PostgreSQL lab host | `localhost` |
-| `PG_PORT` | PostgreSQL lab port | `5433` |
-| `PG_USER` | PostgreSQL lab user | `postgres` |
-| `PG_PASSWORD` | PostgreSQL lab password | `postgres` |
-| `LOG_LEVEL` | Logging level | `INFO` |
-| `ENV` | Environment | `development` |
-
-#### Frontend Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL | `http://localhost:8000` |
-
-### Collector Configuration
-
-Collectors can be configured via the API or [backend/services/scheduler.py](backend/services/scheduler.py):
-
-```python
-# Collection interval (minutes)
-scheduler.start(interval_minutes=5)
-
-# Minimum duration threshold (ms)
-collector.fetch_slow_queries(min_duration_ms=1000.0, limit=100)
-```
-
-### Analyzer Configuration
-
-Analyzer thresholds in [backend/services/analyzer.py](backend/services/analyzer.py):
-
-```python
-# Duration threshold for heuristic analysis
-DURATION_THRESHOLD_MS = 5000
-
-# Rows examined/returned ratio threshold
-ROW_RATIO_THRESHOLD = 100
-```
-
-## Database Schema
-
-### Internal Database Tables
-
-1. **slow_query_raw** - Raw collected queries
-2. **slow_query_fingerprint** - Normalized query patterns
-3. **analysis_result** - Analysis results and suggestions
-4. **collector_run_history** - Collection execution logs
-5. **feedback_history** - User feedback for learning loop
-
-### Views
-
-- **v_slow_query_summary** - Aggregated query statistics
-- **v_improvement_opportunities** - Queries with optimization potential
-
-See [backend/db/init_schema.sql](backend/db/init_schema.sql) for complete schema.
-
-## API Documentation
-
-### Endpoints
-
-#### Slow Queries
-
-- `GET /api/v1/slow-queries` - List slow queries (paginated)
-- `GET /api/v1/slow-queries/{id}` - Get query details
-- `GET /api/v1/slow-queries/{id}/raw` - Get raw query instances
-- `GET /api/v1/slow-queries/{id}/analysis` - Get analysis results
-
-#### Statistics
-
-- `GET /api/v1/stats` - Get system statistics
-- `GET /api/v1/stats/by-database` - Database distribution
-- `GET /api/v1/stats/by-improvement` - Improvement distribution
-
-#### Collectors
-
-- `POST /api/v1/collectors/mysql/collect` - Trigger MySQL collection
-- `POST /api/v1/collectors/postgres/collect` - Trigger PostgreSQL collection
-- `GET /api/v1/collectors/status` - Get collector status
-- `POST /api/v1/collectors/start` - Start scheduler
-- `POST /api/v1/collectors/stop` - Stop scheduler
-
-#### Analyzer
-
-- `POST /api/v1/analyzer/analyze` - Trigger analysis
-- `POST /api/v1/analyzer/analyze/{id}` - Analyze specific query
-- `GET /api/v1/analyzer/status` - Get analyzer status
-
-#### Health
-
-- `GET /health` - Health check endpoint
-
-Full API documentation available at [http://localhost:8000/docs](http://localhost:8000/docs) when running.
-
-## Development
-
-### Project Structure
+## 🗂️ Project Structure
 
 ```
-sql-analizer/
-├── ai-query-lab/              # Lab databases
-│   ├── docker-compose.yml
-│   ├── mysql/
-│   │   └── init_lab.sql       # MySQL test data
-│   └── postgres/
-│       └── init_lab.sql       # PostgreSQL test data
-├── backend/
-│   ├── api/
-│   │   └── routes/            # API endpoints
-│   ├── db/
-│   │   ├── init_schema.sql    # Database schema
-│   │   ├── models.py          # SQLAlchemy models
-│   │   └── repository.py     # Data access layer
-│   ├── services/
-│   │   ├── mysql_collector.py
-│   │   ├── postgres_collector.py
-│   │   ├── analyzer.py        # Rule-based analyzer
-│   │   ├── ai_stub.py         # AI integration stub
-│   │   ├── fingerprint.py     # Query normalization
-│   │   └── scheduler.py       # Background jobs
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── main.py                # FastAPI application
-├── frontend/
-│   ├── src/
-│   │   ├── pages/             # React pages
-│   │   ├── services/          # API client
-│   │   └── types/             # TypeScript types
-│   ├── Dockerfile
-│   ├── nginx.conf             # Production nginx config
-│   ├── package.json
-│   └── vite.config.ts
-├── docker-compose.yml         # Development compose
-├── docker-compose.prod.yml    # Production compose
-├── .env.prod.example          # Production env template
-├── start.sh                   # Startup script
+dbpower-base/
+├── docker-compose.yml       # All services
+├── .env.example             # Configuration template
+├── backend/                 # FastAPI application
+│   ├── core/                # Config & logging
+│   ├── db/                  # SQLite models
+│   ├── services/            # Collector, Analyzer, AI client
+│   ├── api/routes/          # API endpoints
+│   └── main.py              # FastAPI app
+├── frontend/                # React dashboard
+│   └── src/
+│       ├── pages/           # Dashboard & QueryDetail
+│       └── services/        # API client
+├── mysql-lab/               # Test MySQL database
+│   ├── init.sql             # Demo data
+│   └── simulate_slow_queries.py
 └── README.md
 ```
 
-### Running Tests
+---
 
-#### Performance Tests (38 Test Cases)
+## 🐛 Troubleshooting
 
-Comprehensive test suite for SQL performance problems:
-
+### Backend fails to start
 ```bash
-cd ai-query-lab/tests
+# Check if AI service is ready
+docker compose logs ai-llama
 
-# Run all tests (MySQL + PostgreSQL)
-./run_tests.sh all
-
-# Run specific database
-./run_tests.sh mysql
-./run_tests.sh postgres
-
-# Run specific categories
-./run_tests.sh mysql SCAN INDEX JOIN
-
-# Run single test
-./run_tests.sh mysql --single SCAN-001
+# Restart backend after AI is ready
+docker compose restart backend
 ```
 
-Test categories:
-- **SCAN**: Full table scans (5 tests)
-- **INDEX**: Missing indexes (5 tests)
-- **JOIN**: JOIN problems (5 tests)
-- **SUB**: Subquery issues (5 tests)
-- **AGG**: Aggregation problems (5 tests)
-- **FUNC**: Function on columns (5 tests)
-- **TYPE**: Type conversions (4 tests)
-- **OR**: OR conditions (4 tests)
-
-See [Testing Guide](TESTING_GUIDE.md) for details.
-
-#### Backend Unit Tests
-
+### LLaMA model download is slow
+The first startup downloads ~5GB. Be patient. Check progress:
 ```bash
-cd backend
-source venv/bin/activate
-
-# Test collectors
-python test_collectors.py
-
-# Test analyzer
-python test_analyzer.py
+docker compose logs -f ai-llama
 ```
 
-#### Frontend Tests
+### No slow queries appearing
+1. Make sure MySQL slow query log is enabled:
+```sql
+SHOW VARIABLES LIKE 'slow_query_log';
+-- Should show: ON
+```
 
+2. Run the query simulator (see "Generate Slow Queries" above)
+
+3. Manually trigger collection from the dashboard
+
+### Frontend shows "Failed to load data"
 ```bash
-cd frontend
-
-# Run unit tests
-npm test
-
-# Run with coverage
-npm test -- --coverage
-```
-
-### Adding New Analysis Rules
-
-Edit [backend/services/analyzer.py](backend/services/analyzer.py):
-
-```python
-def _analyze_mysql_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
-    # Add your custom rule here
-    if your_condition:
-        return {
-            'problem': 'Your problem description',
-            'root_cause': 'Why it happens',
-            'suggestions': [
-                {
-                    'priority': 'HIGH',
-                    'action': 'What to do',
-                    'rationale': 'Why it helps'
-                }
-            ],
-            'improvement_level': 'HIGH',
-            'estimated_speedup': '10-50x',
-            'confidence_score': 0.85
-        }
-```
-
-### Integrating Real AI
-
-Replace the stub in [backend/services/ai_stub.py](backend/services/ai_stub.py):
-
-```python
-def _openai_analysis(self, sql, explain_plan, db_type, duration_ms):
-    import openai
-
-    client = openai.OpenAI(api_key=self.api_key)
-
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{
-            "role": "system",
-            "content": "You are a database performance expert..."
-        }, {
-            "role": "user",
-            "content": f"Analyze this query:\n{sql}\n\nEXPLAIN:\n{explain_plan}"
-        }]
-    )
-
-    return self._parse_ai_response(response.choices[0].message.content)
-```
-
-## Deployment
-
-### Production Checklist
-
-- [ ] Update passwords in `.env.prod`
-- [ ] Configure external database connections
-- [ ] Set up SSL/TLS certificates
-- [ ] Configure firewall rules
-- [ ] Set up monitoring and alerting
-- [ ] Configure backup schedule
-- [ ] Review log levels
-- [ ] Test health checks
-- [ ] Load test the system
-
-### Security Considerations
-
-1. **Database Passwords**: Change all default passwords
-2. **Redis Password**: Enable Redis authentication
-3. **Network Isolation**: Use Docker networks appropriately
-4. **CORS Configuration**: Restrict allowed origins in production
-5. **Rate Limiting**: Consider adding rate limiting to API
-6. **Input Validation**: All inputs are validated by Pydantic
-
-### Performance Tuning
-
-1. **Backend Workers**: Adjust workers in [docker-compose.prod.yml](docker-compose.prod.yml) based on CPU cores
-2. **Collection Interval**: Balance between freshness and overhead
-3. **Database Indexes**: Ensure indexes on frequently queried columns
-4. **Redis Memory**: Configure maxmemory and eviction policy
-5. **Nginx Caching**: Fine-tune cache headers for static assets
-
-### Monitoring
-
-#### Health Checks
-
-All services include health checks:
-
-```bash
-# Check all services
-docker compose ps
-
-# Check specific service
+# Check backend health
 curl http://localhost:8000/health
+
+# Check backend logs
+docker compose logs backend
 ```
 
-#### Logs
+---
 
+## 📊 API Endpoints
+
+### Slow Queries
+- `GET /api/v1/slow-queries` - List all slow queries
+- `GET /api/v1/slow-queries/{id}` - Get query details
+- `GET /api/v1/slow-queries/stats/summary` - Get statistics
+
+### Analysis
+- `POST /api/v1/analyze/{id}` - Analyze a specific query
+- `GET /api/v1/analyze/{id}` - Get analysis results
+- `POST /api/v1/analyze/collect` - Manually trigger collection
+
+### Health
+- `GET /health` - Backend + AI health check
+- `GET /` - API info
+
+**Interactive docs:** http://localhost:8000/docs
+
+---
+
+## 🎯 Using with Your Own MySQL
+
+To monitor your production MySQL:
+
+1. **Enable slow query log** on your MySQL server:
+```sql
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 0.5;  -- Queries taking >0.5s
+SET GLOBAL log_output = 'TABLE';   -- Log to mysql.slow_log table
+```
+
+2. **Update `.env`**:
+```env
+MYSQL_HOST=your-mysql-host
+MYSQL_PORT=3306
+MYSQL_USER=your-user
+MYSQL_PASSWORD=your-password
+MYSQL_DATABASE=mysql  # Database containing slow_log table
+```
+
+3. **Restart backend**:
 ```bash
-# View all logs
-docker compose logs -f
-
-# View specific service
-docker compose logs -f backend
-
-# View last 100 lines
-docker compose logs --tail=100 backend
+docker compose restart backend
 ```
 
-#### Metrics
+4. **Remove mysql-lab** from `docker-compose.yml` (optional)
 
-Access the Statistics page in the UI for:
-- Total queries collected
-- Queries analyzed
-- Improvement distribution
-- Database distribution
-- Collector run history
+---
 
-## Troubleshooting
+## 🔒 Security Notes
 
-### Lab Databases Not Starting
+⚠️ **This is an internal tool with NO authentication!**
 
-```bash
-# Check if ports are in use
-netstat -ln | grep -E '3307|5433'
+For production use:
+- Add authentication (JWT, OAuth, etc.)
+- Restrict network access (firewall, VPN)
+- Use read-only MySQL user
+- Enable HTTPS
+- Review CORS settings in `backend/main.py`
 
-# Remove old containers
-docker compose down -v
-cd ai-query-lab && docker compose down -v && cd ..
+---
 
-# Restart
-./start.sh dev
-```
+## 🚦 Performance Tips
 
-### Backend Can't Connect to Lab Databases
+- **Collection Interval**: Adjust `COLLECTION_INTERVAL` in `.env` (default: 300s)
+- **Batch Size**: Collector fetches 100 queries per run (adjust in `collector.py`)
+- **LLaMA Model**: Smaller models = faster analysis (e.g., `llama3.1:7b` vs `llama3.1:70b`)
+- **SQLite Storage**: Analysis results stored in `/app/cache/dbpower.db` (persistent)
 
-1. Check if lab databases are running: `docker ps`
-2. Verify credentials in environment variables
-3. Test connection manually:
-```bash
-# MySQL
-mysql -h 127.0.0.1 -P 3307 -u root -proot
+---
 
-# PostgreSQL
-psql -h 127.0.0.1 -p 5433 -U postgres
-```
+## 📝 License
 
-### No Queries Being Collected
+MIT License - Free to use and modify
 
-1. Check collector status: `GET /api/v1/collectors/status`
-2. Verify slow query logging is enabled in lab databases
-3. Check collector logs: `docker compose logs backend`
-4. Manually trigger collection: `POST /api/v1/collectors/mysql/collect`
+---
 
-### Frontend Not Loading
+## 🤝 Contributing
 
-1. Check if backend is running: `curl http://localhost:8000/health`
-2. Check nginx logs: `docker compose logs frontend`
-3. Verify API URL in frontend environment variables
-4. Check browser console for CORS errors
+This is a simplified version. Feel free to extend:
+- Add PostgreSQL support
+- Multi-database monitoring
+- Email alerts for critical queries
+- Query comparison (before/after optimization)
+- Integration with Grafana
 
-### Database Schema Issues
+---
 
-```bash
-# Recreate internal database
-docker compose down internal-db
-docker volume rm sql-analizer_internal-db-data
-docker compose up -d internal-db
+## 📞 Support
 
-# Or use clean command
-./start.sh clean
-```
+For issues or questions:
+1. Check logs: `docker compose logs`
+2. Verify configuration in `.env`
+3. Ensure all containers are running: `docker compose ps`
 
-## Contributing
+---
 
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Run tests: `npm test` and `python test_*.py`
-5. Commit your changes: `git commit -m 'Add amazing feature'`
-6. Push to the branch: `git push origin feature/amazing-feature`
-7. Open a Pull Request
-
-### Code Style
-
-- **Backend**: Follow PEP 8, use type hints
-- **Frontend**: Follow ESLint rules, use TypeScript strictly
-- **Commits**: Use conventional commits format
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- FastAPI for the excellent web framework
-- React and Vite for modern frontend tooling
-- SQLAlchemy for powerful ORM capabilities
-- Docker for containerization
-- TailwindCSS for utility-first styling
-
-## Support
-
-For issues, questions, or contributions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review API docs at `/docs` endpoint
-
-## Roadmap
-
-- [ ] AI integration (OpenAI, Anthropic, local models)
-- [ ] Learning loop with user feedback
-- [ ] Query rewrite suggestions
-- [ ] Historical trend analysis
-- [ ] Automated index recommendations
-- [ ] Multi-tenant support
-- [ ] Grafana dashboards
-- [ ] Slack/email notifications
-- [ ] Query execution simulation
+**Built with ❤️ using FastAPI, React, and LLaMA 3.1**
