@@ -37,10 +37,12 @@ def collect_slow_queries() -> Dict[str, Any]:
     Returns:
         Dictionary with collection result
     """
-    logger.info("Starting slow query collection from MySQL...")
+    collection_start = datetime.utcnow()
+    logger.info("🔍 Starting slow query collection from MySQL...")
     
     try:
         # Connect to MySQL
+        logger.info(f"📡 DB Poll | Connecting to MySQL at {settings.mysql_host}:{settings.mysql_port}")
         conn = mysql.connector.connect(**settings.get_mysql_dict())
         cursor = conn.cursor(dictionary=True)
         
@@ -49,7 +51,7 @@ def collect_slow_queries() -> Dict[str, Any]:
         last_query = db.query(SlowQuery).order_by(SlowQuery.start_time.desc()).first()
         last_timestamp = last_query.start_time if last_query else datetime(2020, 1, 1)
         
-        logger.info(f"Collecting queries since: {last_timestamp}")
+        logger.info(f"📅 Collecting queries since: {last_timestamp}")
         
         # Query slow_log for new entries, excluding DBPower monitoring user
         query = """
@@ -72,10 +74,12 @@ def collect_slow_queries() -> Dict[str, Any]:
         # Filter pattern for DBPower user (matches user_host like 'dbpower_monitor@%')
         dbpower_filter = f"{settings.dbpower_user}@%"
         
+        logger.info(f"📊 DB Poll | Query: SELECT FROM mysql.slow_log WHERE start_time > {last_timestamp} AND user_host NOT LIKE '{dbpower_filter}' LIMIT 100")
         cursor.execute(query, (last_timestamp, dbpower_filter))
         rows = cursor.fetchall()
         
-        logger.info(f"Found {len(rows)} new slow queries")
+        poll_duration = (datetime.utcnow() - collection_start).total_seconds()
+        logger.info(f"✅ DB Poll Complete | Found: {len(rows)} queries | Duration: {poll_duration:.3f}s")
         
         # Store in local database
         collected_count = 0
@@ -124,7 +128,13 @@ def collect_slow_queries() -> Dict[str, Any]:
         cursor.close()
         conn.close()
         
-        logger.info(f"Successfully collected {collected_count} slow queries (skipped {skipped_duplicates} duplicates)")
+        total_duration = (datetime.utcnow() - collection_start).total_seconds()
+        logger.info(
+            f"✅ Collection Complete | "
+            f"Collected: {collected_count} | "
+            f"Skipped: {skipped_duplicates} | "
+            f"Total Duration: {total_duration:.3f}s"
+        )
         return {
             "collected": collected_count,
             "skipped_duplicates": skipped_duplicates,

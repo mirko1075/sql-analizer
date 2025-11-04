@@ -1,8 +1,8 @@
-# 🧠 DBPower Base - LLaMA Edition
+# 🧠 DBPower Base - Multi-AI Provider Edition
 
-**AI-Powered MySQL Query Analyzer with Local LLaMA Model**
+**AI-Powered MySQL Query Analyzer with Flexible AI Backends**
 
-A simplified, on-premise solution for monitoring and analyzing slow MySQL queries using rule-based detection combined with local LLaMA AI (no external API calls required).
+A simplified, on-premise solution for monitoring and analyzing slow MySQL queries using rule-based detection combined with AI insights. Choose between local LLaMA (100% private) or cloud providers (OpenAI/Anthropic) based on your needs.
 
 ---
 
@@ -10,11 +10,26 @@ A simplified, on-premise solution for monitoring and analyzing slow MySQL querie
 
 - 🔍 **Real-time Slow Query Detection** - Monitors MySQL `slow_log` table
 - 📊 **Smart Analysis** - Combines rule-based checks with AI insights
-- 🧠 **Local AI with LLaMA** - Uses Ollama for on-premise AI analysis (no OpenAI/Claude)
+- 🧠 **Multiple AI Providers** - Choose between LLaMA (local), OpenAI, or Anthropic
+- 🔐 **Privacy Options** - 100% local with LLaMA or cloud-based for better quality
 - 💡 **Index Suggestions** - Automatically recommends missing indexes
 - 🚀 **Easy Deployment** - Everything runs in Docker Compose
 - 🎯 **No Authentication** - Simple internal tool (add auth if needed)
 - 📈 **Performance Metrics** - Track query time, rows examined, efficiency ratios
+- 📝 **Complete Logging** - All DB polls and AI calls are logged for audit
+- 🏷️ **Query Lifecycle** - Status management (pending/analyzed/archived/resolved)
+
+---
+
+## 🤖 AI Provider Options
+
+| Provider | Privacy | Cost | Quality | Setup |
+|----------|---------|------|---------|-------|
+| **LLaMA** | ✅ 100% Local | Free | Good | Easy |
+| **OpenAI** | ⚠️ Cloud | $$$ | Excellent | API Key |
+| **Anthropic** | ⚠️ Cloud | $$ | Excellent | API Key |
+
+**See [AI Provider Documentation](docs/AI_PROVIDERS.md) for detailed comparison.**
 
 ---
 

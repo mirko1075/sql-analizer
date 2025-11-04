@@ -48,9 +48,8 @@ async def trigger_analysis(query_id: int) -> Dict[str, Any]:
         Analysis result or job status
     """
     try:
-        # Run analysis synchronously for now
-        # Can be moved to background task for production
-        result = analyze_query(query_id)
+        # Run analysis asynchronously
+        result = await analyze_query(query_id)
         
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])

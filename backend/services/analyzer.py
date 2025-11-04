@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from core.config import settings
 from core.logger import setup_logger
 from db.models import SlowQuery, AnalysisResult, get_db
-from services.ai_llama_client import analyze_with_llama
+from services.ai import get_ai_provider, AIAnalysisRequest
 
 logger = setup_logger(__name__, settings.log_level)
 
@@ -328,7 +328,7 @@ def analyze_rules(sql: str, query_info: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def analyze_query(query_id: int) -> Dict[str, Any]:
+async def analyze_query(query_id: int) -> Dict[str, Any]:
     """
     Perform comprehensive analysis on a slow query.
     Gathers: EXPLAIN plan, schema info, indexes, statistics, locks, AI analysis.
@@ -417,11 +417,37 @@ def analyze_query(query_id: int) -> Dict[str, Any]:
             "locks": lock_info
         }
         
-        ai_analysis_text = analyze_with_llama(
-            sql=slow_query.sql_text,
+        # ==== STEP 5: AI Analysis with new provider system ====
+        logger.info(f"🤖 Analyzing with AI provider...")
+        
+        # Prepare AI analysis request
+        ai_request = AIAnalysisRequest(
+            sql_query=slow_query.sql_text,
             explain_plan=explain_text,
-            context=context_with_schema
+            schema_info=schema_info,
+            table_stats={
+                "query_time": query_info.get("query_time"),
+                "rows_examined": query_info.get("rows_examined"),
+                "rows_sent": query_info.get("rows_sent"),
+            },
+            lock_info=json.dumps(lock_info) if lock_info else None,
+            index_info={table: {"indexes": indexes} for table, indexes in [(t, get_table_indexes(t)) for t in schema_info.keys()]}
         )
+        
+        # Get AI provider and analyze
+        ai_provider = get_ai_provider()
+        ai_response = await ai_provider.analyze_query(ai_request)
+        
+        if ai_response.error:
+            logger.error(f"AI analysis error: {ai_response.error}")
+            ai_analysis_text = f"AI analysis failed: {ai_response.error}"
+        else:
+            ai_analysis_text = ai_response.analysis
+            logger.info(
+                f"AI analysis completed | Provider: {ai_response.provider} | "
+                f"Model: {ai_response.model} | Duration: {ai_response.duration_ms:.2f}ms | "
+                f"Tokens: {ai_response.tokens_used or 'N/A'}"
+            )
         
         # Calculate analysis duration
         analysis_duration = (datetime.utcnow() - start_time).total_seconds()

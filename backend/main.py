@@ -10,7 +10,7 @@ from core.config import settings
 from core.logger import setup_logger
 from db.models import init_db
 from services.collector import collect_slow_queries
-from services.ai_llama_client import ensure_model_loaded, check_llama_health
+from services.ai import check_provider_health, get_ai_provider
 from api.routes import slow_queries, analyze, stats
 
 logger = setup_logger(__name__, settings.log_level)
@@ -42,18 +42,17 @@ async def lifespan(app: FastAPI):
     logger.info("📊 Initializing SQLite database...")
     init_db()
     
-    # Check LLaMA service health
-    logger.info("🧠 Checking AI (LLaMA) service health...")
-    health = check_llama_health()
-    if health["status"] == "healthy":
-        logger.info(f"✅ AI service is healthy - {health['models']} models available")
-        
-        # Ensure model is loaded
-        logger.info(f"🔄 Ensuring model '{settings.ai_model}' is loaded...")
-        ensure_model_loaded()
-        logger.info("✅ Model ready for analysis")
+    # Check AI Provider health
+    logger.info(f"🧠 Checking AI Provider ({settings.ai_provider}) health...")
+    health = await check_provider_health()
+    if health:
+        provider = get_ai_provider()
+        provider_name = provider.__class__.__name__.replace('Provider', '')
+        logger.info(f"✅ AI Provider {provider_name} is healthy")
+        logger.info(f"   Model: {getattr(provider, 'model', 'unknown')}")
+        logger.info(f"   Privacy: {'🔒 100% Local' if settings.ai_provider == 'llama' else '⚠️  Cloud (data sent externally)'}")
     else:
-        logger.warning(f"⚠️  AI service not ready: {health['message']}")
+        logger.warning(f"⚠️  AI Provider not ready")
         logger.warning("Analysis will be limited to rule-based checks only")
     
     # Start background collection task
@@ -114,8 +113,9 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     
-    # Check AI service
-    ai_health = check_llama_health()
+    # Check AI provider
+    ai_health = await check_provider_health()
+    provider = get_ai_provider()
     
     return {
         "status": "healthy",
@@ -125,9 +125,10 @@ async def health_check():
             "status": "connected"
         },
         "ai": {
-            "service": ai_health["status"],
-            "model": settings.ai_model,
-            "available_models": ai_health.get("models", 0)
+            "provider": settings.ai_provider,
+            "status": "healthy" if ai_health else "unhealthy",
+            "model": getattr(provider, 'model', 'unknown'),
+            "privacy": "local" if settings.ai_provider == "llama" else "cloud"
         }
     }
 

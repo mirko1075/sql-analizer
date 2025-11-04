@@ -106,12 +106,16 @@ async def get_analyzer_status() -> Dict[str, Any]:
         Dictionary with analyzer status information
     """
     try:
-        from services.ai_llama_client import check_llama_health
+        from services.ai import check_provider_health, get_ai_provider
         
         db = next(get_db())
         
+        # Get AI provider info
+        ai_provider = get_ai_provider()
+        provider_name = ai_provider.__class__.__name__.replace('Provider', '').lower()
+        
         # Get AI service health
-        ai_health = check_llama_health()
+        ai_health = await check_provider_health()
         
         # Get analysis stats
         total_analyzed = db.query(SlowQuery).filter(SlowQuery.analyzed == True).count()
@@ -122,12 +126,13 @@ async def get_analyzer_status() -> Dict[str, Any]:
         last_analysis = db.query(AnalysisResult).order_by(AnalysisResult.analyzed_at.desc()).first()
         
         return {
-            "status": "active" if ai_health["status"] == "healthy" else "degraded",
+            "status": "active" if ai_health else "degraded",
             "ai_service": {
-                "status": ai_health["status"],
-                "model": settings.ai_model,
-                "available_models": ai_health.get("models", 0),
-                "base_url": settings.ai_base_url
+                "provider": provider_name,
+                "status": "healthy" if ai_health else "unhealthy",
+                "model": getattr(ai_provider, 'model', 'unknown'),
+                "base_url": getattr(ai_provider, 'base_url', 'unknown'),
+                "privacy": "local" if provider_name == "llama" else "cloud"
             },
             "analysis_stats": {
                 "total_analyzed": total_analyzed,
@@ -139,9 +144,9 @@ async def get_analyzer_status() -> Dict[str, Any]:
             },
             "capabilities": {
                 "rule_based_analysis": True,
-                "ai_analysis": ai_health["status"] == "healthy",
+                "ai_analysis": ai_health,
                 "index_suggestions": True,
-                "query_rewrite": ai_health["status"] == "healthy"
+                "query_rewrite": ai_health
             }
         }
         

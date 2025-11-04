@@ -26,7 +26,29 @@ class Settings:
     dbpower_user: str = os.getenv("DBPOWER_USER", "dbpower_monitor")
     dbpower_password: str = os.getenv("DBPOWER_PASSWORD", "dbpower_secure_pass")
     
-    # AI Configuration
+    # AI Configuration - Provider Selection
+    ai_provider: str = os.getenv("AI_PROVIDER", "llama").lower()  # llama, openai, anthropic
+    ai_log_requests: bool = os.getenv("AI_LOG_REQUESTS", "true").lower() == "true"
+    ai_timeout: float = float(os.getenv("AI_TIMEOUT", "120.0"))
+    ai_max_retries: int = int(os.getenv("AI_MAX_RETRIES", "3"))
+    
+    # LLaMA/Ollama Configuration (local)
+    llama_base_url: str = os.getenv("LLAMA_BASE_URL", "http://ai-llama:11434")
+    llama_model: str = os.getenv("LLAMA_MODEL", "llama3.1:8b")
+    
+    # OpenAI Configuration (cloud)
+    openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
+    openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    openai_max_tokens: int = int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
+    
+    # Anthropic Configuration (cloud)
+    anthropic_api_key: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-3-sonnet-20240229")
+    anthropic_base_url: str = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1")
+    anthropic_max_tokens: int = int(os.getenv("ANTHROPIC_MAX_TOKENS", "2000"))
+    
+    # Legacy AI Configuration (backward compatibility)
     ai_base_url: str = os.getenv("AI_BASE_URL", "http://ai-llama:11434")
     ai_model: str = os.getenv("AI_MODEL", "llama3.1:8b")
     
