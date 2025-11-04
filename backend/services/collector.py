@@ -53,7 +53,8 @@ def collect_slow_queries() -> Dict[str, Any]:
         
         logger.info(f"📅 Collecting queries since: {last_timestamp}")
         
-        # Query slow_log for new entries, excluding DBPower monitoring user
+        # Query slow_log for new entries, excluding DBPower monitoring user, SLEEP queries, and self-referencing queries
+        # We collect application queries but exclude the collector's own queries to slow_log
         query = """
         SELECT 
             start_time,
@@ -67,19 +68,29 @@ def collect_slow_queries() -> Dict[str, Any]:
         FROM mysql.slow_log
         WHERE start_time > %s
           AND user_host NOT LIKE %s
-        ORDER BY start_time DESC
+          AND sql_text NOT LIKE 'SELECT SLEEP%%'
+          AND sql_text NOT LIKE '%%FROM mysql.slow_log%%'
+          AND sql_text NOT LIKE '%%mysql.slow_log%%'
+        ORDER BY query_time DESC
         LIMIT 100
         """
         
         # Filter pattern for DBPower user (matches user_host like 'dbpower_monitor@%')
         dbpower_filter = f"{settings.dbpower_user}@%"
         
-        logger.info(f"📊 DB Poll | Query: SELECT FROM mysql.slow_log WHERE start_time > {last_timestamp} AND user_host NOT LIKE '{dbpower_filter}' LIMIT 100")
+        logger.info(f"📊 DB Poll | Query: SELECT FROM mysql.slow_log WHERE start_time > {last_timestamp} AND user_host NOT LIKE '{dbpower_filter}' AND sql_text NOT LIKE 'SELECT SLEEP%' AND sql_text NOT LIKE '%FROM mysql.slow_log%' ORDER BY query_time DESC LIMIT 100")
+        logger.info(f"🔍 Executing query with parameters: last_timestamp={last_timestamp}, dbpower_filter={dbpower_filter}")
         cursor.execute(query, (last_timestamp, dbpower_filter))
         rows = cursor.fetchall()
         
         poll_duration = (datetime.utcnow() - collection_start).total_seconds()
         logger.info(f"✅ DB Poll Complete | Found: {len(rows)} queries | Duration: {poll_duration:.3f}s")
+        
+        if len(rows) == 0:
+            logger.info(f"⚠️  No rows returned. Testing if any queries exist in slow_log...")
+            cursor.execute("SELECT COUNT(*) as cnt FROM mysql.slow_log")
+            total_rows = cursor.fetchone()
+            logger.info(f"   Total rows in slow_log: {total_rows['cnt'] if total_rows else 0}")
         
         # Store in local database
         collected_count = 0

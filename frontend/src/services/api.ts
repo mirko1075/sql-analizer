@@ -109,4 +109,16 @@ export const resolveQuery = (queryId: number) => {
   return api.post(`/slow-queries/${queryId}/resolve`);
 };
 
+export const analyzeWithAI = (queryId: number) => {
+  return api.post(`/ai/analyze/${queryId}`);
+};
+
+export const getAIAnalysis = (queryId: number) => {
+  return api.get(`/ai/analysis/${queryId}`);
+};
+
+export const getAIStatus = () => {
+  return api.get('/ai/status');
+};
+
 export default api;

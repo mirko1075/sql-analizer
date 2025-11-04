@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSlowQuery, getAnalysis, analyzeQuery, updateQueryStatus, type SlowQuery, type AnalysisResult } from '../services/api';
+import { 
+  getSlowQuery, 
+  getAIAnalysis, 
+  updateQueryStatus, 
+  analyzeWithAI,
+  type SlowQuery, 
+  type AnalysisResult 
+} from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
 export default function QueryDetail() {
@@ -10,7 +17,7 @@ export default function QueryDetail() {
   const [query, setQuery] = useState<SlowQuery | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzingAI, setAnalyzingAI] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,7 +35,7 @@ export default function QueryDetail() {
       // If already analyzed, load analysis
       if (queryRes.data.analyzed) {
         try {
-          const analysisRes = await getAnalysis(queryId);
+          const analysisRes = await getAIAnalysis(queryId);
           setAnalysis(analysisRes.data);
         } catch (err) {
           console.error('Failed to load analysis:', err);
@@ -42,15 +49,16 @@ export default function QueryDetail() {
   };
 
   const handleAnalyze = async () => {
-    setAnalyzing(true);
+    setAnalyzingAI(true);
     setError(null);
     try {
-      await analyzeQuery(queryId);
+      console.log(`🤖 Starting AI analysis for query ${queryId}...`);
+      await analyzeWithAI(queryId);
       await loadQuery(); // Reload to get analysis results
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Analysis failed');
+      setError(err.response?.data?.detail || err.message || 'AI analysis failed');
     } finally {
-      setAnalyzing(false);
+      setAnalyzingAI(false);
     }
   };
 
@@ -158,11 +166,35 @@ export default function QueryDetail() {
       {/* Analysis Section */}
       {!query.analyzed ? (
         <div className="card">
-          <h2>🧠 Analysis</h2>
-          <p>This query has not been analyzed yet.</p>
-          <button onClick={handleAnalyze} disabled={analyzing} style={{ marginTop: '16px' }}>
-            {analyzing ? '⏳ Analyzing with AI...' : '🚀 Analyze with LLaMA AI'}
+          <h2>🧠 AI Analysis</h2>
+          <p>This query has not been analyzed with AI yet.</p>
+          <p style={{ marginTop: '12px', fontSize: '0.9em', color: '#7f8c8d' }}>
+            Click the button below to start an interactive AI analysis. 
+            The AI will examine the query and may request additional data from the database to provide comprehensive optimization recommendations.
+          </p>
+          <button 
+            onClick={handleAnalyze} 
+            disabled={analyzingAI} 
+            style={{ 
+              marginTop: '16px',
+              padding: '12px 24px',
+              fontSize: '16px',
+              backgroundColor: analyzingAI ? '#95a5a6' : '#3498db',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: analyzingAI ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {analyzingAI ? '⏳ Analyzing with AI... (This may take 30-60 seconds)' : '🤖 Analyze with AI'}
           </button>
+          {analyzingAI && (
+            <div style={{ marginTop: '16px', padding: '12px', background: '#f0f8ff', borderRadius: '6px', fontSize: '0.9em' }}>
+              <div>🔄 Running enhanced rule-based analysis (20+ rules)...</div>
+              <div>🤖 AI is analyzing the query and may request additional database information...</div>
+              <div>💡 The AI can execute SELECT queries to gather statistics and schema details...</div>
+            </div>
+          )}
         </div>
       ) : analysis ? (
         <>
