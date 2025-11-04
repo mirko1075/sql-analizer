@@ -49,6 +49,10 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DB: ${MYSQL_DB}
       
+      # DBPower monitoring user - from .env
+      DBPOWER_USER: ${DBPOWER_USER}
+      DBPOWER_PASSWORD: ${DBPOWER_PASSWORD}
+      
       # AI LLaMA connection - from .env
       AI_BASE_URL: ${AI_BASE_URL}
       AI_MODEL: ${AI_MODEL}

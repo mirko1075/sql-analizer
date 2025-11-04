@@ -14,8 +14,30 @@ logger = setup_logger(__name__, settings.log_level)
 router = APIRouter(prefix="/api/v1/analyze", tags=["analyze"])
 
 
+@router.post("/collect")
+async def trigger_collection() -> Dict[str, Any]:
+    """
+    Manually trigger slow query collection.
+    
+    Returns:
+        Collection result with number of queries collected
+    """
+    try:
+        result = collect_slow_queries()
+        
+        return {
+            "status": "completed",
+            "collected": result.get("collected", 0),
+            "message": result.get("message", "Collection completed")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error triggering collection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/{query_id}")
-async def trigger_analysis(query_id: int, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+async def trigger_analysis(query_id: int) -> Dict[str, Any]:
     """
     Trigger analysis for a specific slow query.
     
@@ -71,26 +93,4 @@ async def get_analysis(query_id: int) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error getting analysis for query {query_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/collect")
-async def trigger_collection(background_tasks: BackgroundTasks) -> Dict[str, Any]:
-    """
-    Manually trigger slow query collection.
-    
-    Returns:
-        Collection result with number of queries collected
-    """
-    try:
-        result = collect_slow_queries()
-        
-        return {
-            "status": "completed",
-            "collected": result.get("collected", 0),
-            "message": result.get("message", "Collection completed")
-        }
-        
-    except Exception as e:
-        logger.error(f"Error triggering collection: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

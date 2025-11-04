@@ -51,7 +51,7 @@ def collect_slow_queries() -> Dict[str, Any]:
         
         logger.info(f"Collecting queries since: {last_timestamp}")
         
-        # Query slow_log for new entries
+        # Query slow_log for new entries, excluding DBPower monitoring user
         query = """
         SELECT 
             start_time,
@@ -64,17 +64,23 @@ def collect_slow_queries() -> Dict[str, Any]:
             CONVERT(sql_text USING utf8) as sql_text
         FROM mysql.slow_log
         WHERE start_time > %s
+          AND user_host NOT LIKE %s
         ORDER BY start_time DESC
         LIMIT 100
         """
         
-        cursor.execute(query, (last_timestamp,))
+        # Filter pattern for DBPower user (matches user_host like 'dbpower_monitor@%')
+        dbpower_filter = f"{settings.dbpower_user}@%"
+        
+        cursor.execute(query, (last_timestamp, dbpower_filter))
         rows = cursor.fetchall()
         
         logger.info(f"Found {len(rows)} new slow queries")
         
         # Store in local database
         collected_count = 0
+        skipped_duplicates = 0
+        
         for row in rows:
             sql_text = row['sql_text']
             if not sql_text or len(sql_text.strip()) == 0:
@@ -84,9 +90,22 @@ def collect_slow_queries() -> Dict[str, Any]:
             query_time_seconds = row['query_time'].total_seconds() if hasattr(row['query_time'], 'total_seconds') else float(row['query_time'])
             lock_time_seconds = row['lock_time'].total_seconds() if (row['lock_time'] and hasattr(row['lock_time'], 'total_seconds')) else (float(row['lock_time']) if row['lock_time'] else 0.0)
             
+            fingerprint = generate_fingerprint(sql_text)
+            
+            # Check if this query already exists (same fingerprint and start_time)
+            existing = db.query(SlowQuery).filter(
+                SlowQuery.sql_fingerprint == fingerprint,
+                SlowQuery.start_time == row['start_time']
+            ).first()
+            
+            if existing:
+                skipped_duplicates += 1
+                logger.debug(f"Skipping duplicate query: {fingerprint[:8]}... at {row['start_time']}")
+                continue
+            
             slow_query = SlowQuery(
                 sql_text=sql_text,
-                sql_fingerprint=generate_fingerprint(sql_text),
+                sql_fingerprint=fingerprint,
                 query_time=query_time_seconds,
                 lock_time=lock_time_seconds,
                 rows_sent=int(row['rows_sent']) if row['rows_sent'] else 0,
@@ -94,7 +113,8 @@ def collect_slow_queries() -> Dict[str, Any]:
                 database_name=row['db'],
                 user_host=row['user_host'],
                 start_time=row['start_time'],
-                collected_at=datetime.utcnow()
+                collected_at=datetime.utcnow(),
+                status='pending'  # New queries start as pending
             )
             
             db.add(slow_query)
@@ -104,9 +124,10 @@ def collect_slow_queries() -> Dict[str, Any]:
         cursor.close()
         conn.close()
         
-        logger.info(f"Successfully collected {collected_count} slow queries")
+        logger.info(f"Successfully collected {collected_count} slow queries (skipped {skipped_duplicates} duplicates)")
         return {
             "collected": collected_count,
+            "skipped_duplicates": skipped_duplicates,
             "message": f"Successfully collected {collected_count} slow queries"
         }
         

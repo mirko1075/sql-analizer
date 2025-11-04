@@ -131,15 +131,19 @@ The simulator will continuously run slow queries to populate the `slow_log` tabl
 Edit `.env` file:
 
 ```env
-# MySQL Configuration
-MYSQL_HOST=mysql-lab
+# MySQL Configuration (External MySQL Server)
+MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=root
-MYSQL_PASSWORD=rootpassword
-MYSQL_DATABASE=labdb
+MYSQL_PASSWORD=admin
+MYSQL_DB=                # Empty = monitor ALL databases
+
+# DBPower Monitoring User (read-only queries, filtered from collection)
+DBPOWER_USER=dbpower_monitor
+DBPOWER_PASSWORD=dbpower_secure_pass
 
 # AI Configuration
-AI_BASE_URL=http://ai-llama:11434
+AI_BASE_URL=http://127.0.0.1:11434
 AI_MODEL=llama3.1:8b
 
 # Backend Settings
@@ -147,6 +151,33 @@ API_PORT=8000
 LOG_LEVEL=INFO
 COLLECTION_INTERVAL=300  # seconds (5 minutes)
 ```
+
+### ⚠️ Critical MySQL Configuration
+
+**DBPower requires MySQL slow query log to use TABLE output mode:**
+
+```bash
+# Quick setup (runtime only):
+mysql -h 127.0.0.1 -u root -padmin < backend/scripts/configure_mysql_slow_log.sql
+
+# Or manually:
+mysql -h 127.0.0.1 -u root -padmin -e "SET GLOBAL log_output = 'TABLE';"
+```
+
+**For persistent configuration**, add to your MySQL `my.cnf` or Docker command:
+
+```yaml
+# docker-compose.yml
+mysql-lab:
+  command: >
+    --slow_query_log=1
+    --log_output=TABLE
+    --long_query_time=0.3
+```
+
+**Why?** DBPower reads from `mysql.slow_log` table. If MySQL is configured with `log_output=FILE`, the table will be empty and no queries will be collected.
+
+See [📖 Troubleshooting Guide](backend/scripts/TROUBLESHOOTING.md) for common issues.
 
 ### Change LLaMA Model
 
@@ -185,6 +216,22 @@ dbpower-base/
 
 ## 🐛 Troubleshooting
 
+### ⚠️ No slow queries being collected
+
+**Most common issue:** MySQL is logging to FILE instead of TABLE.
+
+```bash
+# Check current setting
+mysql -h 127.0.0.1 -u root -padmin -e "SHOW VARIABLES LIKE 'log_output';"
+
+# If it shows "FILE", change it:
+mysql -h 127.0.0.1 -u root -padmin < backend/scripts/configure_mysql_slow_log.sql
+```
+
+**See the full troubleshooting guide:** [📖 TROUBLESHOOTING.md](backend/scripts/TROUBLESHOOTING.md)
+
+---
+
 ### Backend fails to start
 ```bash
 # Check if AI service is ready
@@ -200,17 +247,6 @@ The first startup downloads ~5GB. Be patient. Check progress:
 docker compose logs -f ai-llama
 ```
 
-### No slow queries appearing
-1. Make sure MySQL slow query log is enabled:
-```sql
-SHOW VARIABLES LIKE 'slow_query_log';
--- Should show: ON
-```
-
-2. Run the query simulator (see "Generate Slow Queries" above)
-
-3. Manually trigger collection from the dashboard
-
 ### Frontend shows "Failed to load data"
 ```bash
 # Check backend health
@@ -219,6 +255,71 @@ curl http://localhost:8000/health
 # Check backend logs
 docker compose logs backend
 ```
+
+---
+
+## 📋 Maintenance Scripts
+
+All scripts are in `backend/scripts/`:
+
+### 1. `configure_mysql_slow_log.sql`
+**Purpose:** Configure MySQL for DBPower collection
+
+**Usage:**
+```bash
+mysql -h 127.0.0.1 -u root -padmin < backend/scripts/configure_mysql_slow_log.sql
+```
+
+**What it does:**
+- Sets `log_output = TABLE` (critical!)
+- Enables `slow_query_log`
+- Sets `long_query_time = 0.3` seconds
+- Enables logging of queries not using indexes
+
+---
+
+### 2. `create_dbpower_user.sql`
+**Purpose:** Create a read-only monitoring user
+
+**Usage:**
+```bash
+mysql -h 127.0.0.1 -u root -padmin < backend/scripts/create_dbpower_user.sql
+```
+
+**What it does:**
+- Creates `dbpower_monitor` user with limited privileges
+- Queries from this user are automatically filtered from collection
+- Prevents recursive monitoring of DBPower's own queries
+
+---
+
+### 3. `quick_cleanup.py`
+**Purpose:** Fast database cleanup without prompts
+
+**Usage:**
+```bash
+docker exec dbpower-backend python scripts/quick_cleanup.py
+```
+
+**What it does:**
+- Deletes all collected slow queries
+- Deletes all analysis results
+- No confirmation prompts (use with caution!)
+
+---
+
+### 4. `cleanup_database.py`
+**Purpose:** Interactive cleanup with options
+
+**Usage:**
+```bash
+docker exec -it dbpower-backend python scripts/cleanup_database.py
+```
+
+**Options:**
+1. Clean collected data (keep schema)
+2. Reset database (drop and recreate all tables)
+3. Exit
 
 ---
 
@@ -244,30 +345,56 @@ docker compose logs backend
 
 ## 🎯 Using with Your Own MySQL
 
-To monitor your production MySQL:
+DBPower can monitor any MySQL server (local or remote).
 
-1. **Enable slow query log** on your MySQL server:
-```sql
-SET GLOBAL slow_query_log = 'ON';
-SET GLOBAL long_query_time = 0.5;  -- Queries taking >0.5s
-SET GLOBAL log_output = 'TABLE';   -- Log to mysql.slow_log table
+### Step 1: Configure MySQL Slow Query Log
+
+```bash
+mysql -h YOUR_HOST -u root -p < backend/scripts/configure_mysql_slow_log.sql
 ```
 
-2. **Update `.env`**:
+**Critical requirement:** `log_output` must be `TABLE`, not `FILE`.
+
+### Step 2: Create Monitoring User (Optional but Recommended)
+
+```bash
+mysql -h YOUR_HOST -u root -p < backend/scripts/create_dbpower_user.sql
+```
+
+This creates a read-only user and prevents DBPower from collecting its own queries.
+
+### Step 3: Update Configuration
+
+Edit `.env`:
 ```env
 MYSQL_HOST=your-mysql-host
 MYSQL_PORT=3306
-MYSQL_USER=your-user
+MYSQL_USER=root
 MYSQL_PASSWORD=your-password
-MYSQL_DATABASE=mysql  # Database containing slow_log table
+MYSQL_DB=                # Empty = monitor ALL databases
+
+DBPOWER_USER=dbpower_monitor
+DBPOWER_PASSWORD=dbpower_secure_pass
 ```
 
-3. **Restart backend**:
+### Step 4: Restart Backend
+
 ```bash
 docker compose restart backend
 ```
 
-4. **Remove mysql-lab** from `docker-compose.yml` (optional)
+### Step 5: Verify
+
+```bash
+# Check health
+curl http://localhost:8000/health
+
+# Trigger manual collection
+curl -X POST http://localhost:8000/api/v1/analyze/collect
+
+# Check stats
+curl http://localhost:8000/api/v1/stats
+```
 
 ---
 

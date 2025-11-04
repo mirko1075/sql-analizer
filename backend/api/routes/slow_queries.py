@@ -1,9 +1,10 @@
 """
 Slow Queries API Routes.
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from pydantic import BaseModel
 
 from db.models import SlowQuery, get_db
 from services.collector import get_all_queries, get_pending_queries
@@ -15,11 +16,17 @@ logger = setup_logger(__name__, settings.log_level)
 router = APIRouter(prefix="/api/v1/slow-queries", tags=["slow-queries"])
 
 
+class StatusUpdate(BaseModel):
+    """Request body for status update."""
+    status: str  # pending, analyzed, archived, resolved
+
+
 @router.get("")
 async def list_slow_queries(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
-    analyzed: Optional[bool] = None
+    analyzed: Optional[bool] = None,
+    status: Optional[str] = Query(None, regex="^(pending|analyzed|archived|resolved)$")
 ) -> Dict[str, Any]:
     """
     List all collected slow queries with pagination.
@@ -27,7 +34,8 @@ async def list_slow_queries(
     Query Parameters:
         skip: Number of records to skip (default: 0)
         limit: Number of records to return (default: 50, max: 500)
-        analyzed: Filter by analyzed status (optional)
+        analyzed: Filter by analyzed status (optional, deprecated - use status instead)
+        status: Filter by status: pending, analyzed, archived, resolved (optional)
     
     Returns:
         Dictionary with queries list and pagination info
@@ -38,8 +46,15 @@ async def list_slow_queries(
         # Build query
         query = db.query(SlowQuery)
         
-        if analyzed is not None:
+        # Status filter (preferred)
+        if status:
+            query = query.filter(SlowQuery.status == status)
+        # Backward compatibility with analyzed filter
+        elif analyzed is not None:
             query = query.filter(SlowQuery.analyzed == analyzed)
+        # Default: show only pending and analyzed (not archived/resolved)
+        else:
+            query = query.filter(SlowQuery.status.in_(['pending', 'analyzed']))
         
         # Get total count
         total = query.count()
@@ -59,6 +74,7 @@ async def list_slow_queries(
                 "rows_sent": q.rows_sent,
                 "database_name": q.database_name,
                 "analyzed": q.analyzed,
+                "status": q.status,
                 "detected_at": q.collected_at.isoformat() if q.collected_at else None
             })
         
@@ -105,6 +121,7 @@ async def get_slow_query(query_id: int) -> Dict[str, Any]:
             "database_name": slow_query.database_name,
             "user_host": slow_query.user_host,
             "analyzed": slow_query.analyzed,
+            "status": slow_query.status,
             "analysis_result_id": slow_query.analysis_result_id,
             "detected_at": slow_query.collected_at.isoformat() if slow_query.collected_at else None
         }
@@ -153,3 +170,90 @@ async def get_summary_stats() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting summary stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{query_id}/status")
+async def update_query_status(
+    query_id: int,
+    status_update: StatusUpdate
+) -> Dict[str, Any]:
+    """
+    Update the status of a slow query.
+    
+    Path Parameters:
+        query_id: ID of the slow query
+    
+    Request Body:
+        status: New status (pending, analyzed, archived, resolved)
+    
+    Returns:
+        Updated query information
+    """
+    try:
+        # Validate status
+        valid_statuses = ['pending', 'analyzed', 'archived', 'resolved']
+        if status_update.status not in valid_statuses:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+            )
+        
+        db = next(get_db())
+        
+        slow_query = db.query(SlowQuery).filter(SlowQuery.id == query_id).first()
+        
+        if not slow_query:
+            raise HTTPException(status_code=404, detail=f"Query with ID {query_id} not found")
+        
+        # Update status
+        old_status = slow_query.status
+        slow_query.status = status_update.status
+        
+        # Also update analyzed flag for backward compatibility
+        if status_update.status == 'analyzed':
+            slow_query.analyzed = True
+        
+        db.commit()
+        
+        logger.info(f"Query {query_id} status updated: {old_status} -> {status_update.status}")
+        
+        return {
+            "id": slow_query.id,
+            "old_status": old_status,
+            "new_status": slow_query.status,
+            "message": f"Query status updated to {slow_query.status}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating query status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{query_id}/archive")
+async def archive_query(query_id: int) -> Dict[str, Any]:
+    """
+    Quick endpoint to archive a query (mark as not interesting).
+    
+    Path Parameters:
+        query_id: ID of the slow query
+    
+    Returns:
+        Confirmation message
+    """
+    return await update_query_status(query_id, StatusUpdate(status='archived'))
+
+
+@router.post("/{query_id}/resolve")
+async def resolve_query(query_id: int) -> Dict[str, Any]:
+    """
+    Quick endpoint to resolve a query (mark as fixed/acknowledged).
+    
+    Path Parameters:
+        query_id: ID of the slow query
+    
+    Returns:
+        Confirmation message
+    """
+    return await update_query_status(query_id, StatusUpdate(status='resolved'))

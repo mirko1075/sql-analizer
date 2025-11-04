@@ -18,6 +18,7 @@ export interface SlowQuery {
   rows_sent: number;
   database_name: string;
   analyzed: boolean;
+  status: 'pending' | 'analyzed' | 'archived' | 'resolved';
   detected_at: string;
   lock_time: number | null;
   analyzed_at?: string | null;
@@ -69,9 +70,10 @@ export interface Stats {
 }
 
 // API methods
-export const getSlowQueries = (skip = 0, limit = 50, analyzed?: boolean) => {
+export const getSlowQueries = (skip = 0, limit = 50, analyzed?: boolean, status?: string) => {
   const params: any = { skip, limit };
   if (analyzed !== undefined) params.analyzed = analyzed;
+  if (status) params.status = status;
   return api.get<QueryListResponse>('/slow-queries', { params });
 };
 
@@ -93,6 +95,18 @@ export const getAnalysis = (queryId: number) => {
 
 export const triggerCollection = () => {
   return api.post('/analyze/collect');
+};
+
+export const updateQueryStatus = (queryId: number, status: string) => {
+  return api.patch(`/slow-queries/${queryId}/status`, { status });
+};
+
+export const archiveQuery = (queryId: number) => {
+  return api.post(`/slow-queries/${queryId}/archive`);
+};
+
+export const resolveQuery = (queryId: number) => {
+  return api.post(`/slow-queries/${queryId}/resolve`);
 };
 
 export default api;

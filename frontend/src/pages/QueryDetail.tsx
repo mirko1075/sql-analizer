@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSlowQuery, getAnalysis, analyzeQuery, type SlowQuery, type AnalysisResult } from '../services/api';
+import { getSlowQuery, getAnalysis, analyzeQuery, updateQueryStatus, type SlowQuery, type AnalysisResult } from '../services/api';
+import StatusBadge from '../components/StatusBadge';
 
 export default function QueryDetail() {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +54,15 @@ export default function QueryDetail() {
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      await updateQueryStatus(queryId, newStatus);
+      await loadQuery(); // Reload to update status
+    } catch (err: any) {
+      alert('Status update failed: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const formatTime = (seconds: number) => {
     if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
     return `${seconds.toFixed(2)}s`;
@@ -86,7 +96,29 @@ export default function QueryDetail() {
 
       {/* Query Information */}
       <div className="card">
-        <h2>📊 Query Information</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2>📊 Query Information</h2>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <StatusBadge status={query.status} />
+            <select
+              value={query.status}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                fontSize: '13px'
+              }}
+            >
+              <option value="pending">⏳ Pending</option>
+              <option value="analyzed">🔍 Analyzed</option>
+              <option value="archived">📦 Archived</option>
+              <option value="resolved">✅ Resolved</option>
+            </select>
+          </div>
+        </div>
         <table>
           <tbody>
             <tr>

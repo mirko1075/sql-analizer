@@ -22,6 +22,10 @@ class Settings:
     mysql_db: str = os.getenv("MYSQL_DB", "")  # Empty = monitor all databases
     mysql_database: str = os.getenv("MYSQL_DB", "")  # Alias for compatibility
     
+    # DBPower Monitoring User (to filter out from slow queries)
+    dbpower_user: str = os.getenv("DBPOWER_USER", "dbpower_monitor")
+    dbpower_password: str = os.getenv("DBPOWER_PASSWORD", "dbpower_secure_pass")
+    
     # AI Configuration
     ai_base_url: str = os.getenv("AI_BASE_URL", "http://ai-llama:11434")
     ai_model: str = os.getenv("AI_MODEL", "llama3.1:8b")

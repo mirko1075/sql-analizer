@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getSlowQueries, getStats, triggerCollection, type SlowQuery, type Stats } from '../services/api';
+import { getSlowQueries, getStats, triggerCollection, archiveQuery, resolveQuery, type SlowQuery, type Stats } from '../services/api';
+import StatusBadge from '../components/StatusBadge';
 
 export default function Dashboard() {
   const [queries, setQueries] = useState<SlowQuery[]>([]);
@@ -10,12 +11,13 @@ export default function Dashboard() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('');
 
   const pageSize = 50;
 
   useEffect(() => {
     loadData();
-  }, [page]);
+  }, [page, statusFilter]); // Reload when status filter changes
 
   const loadData = async () => {
     try {
@@ -23,7 +25,7 @@ export default function Dashboard() {
       setError(null);
 
       const [queriesRes, statsRes] = await Promise.all([
-        getSlowQueries(page * pageSize, pageSize),
+        getSlowQueries(page * pageSize, pageSize, undefined, statusFilter || undefined),
         getStats()
       ]);
 
@@ -46,6 +48,19 @@ export default function Dashboard() {
       alert('Collection failed: ' + (err.response?.data?.detail || err.message));
     } finally {
       setCollecting(false);
+    }
+  };
+
+  const handleStatusChange = async (queryId: number, newStatus: 'archived' | 'resolved') => {
+    try {
+      if (newStatus === 'archived') {
+        await archiveQuery(queryId);
+      } else {
+        await resolveQuery(queryId);
+      }
+      await loadData(); // Reload to update the list
+    } catch (err: any) {
+      alert('Status update failed: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -96,11 +111,36 @@ export default function Dashboard() {
       )}
 
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
           <h2>Slow Queries</h2>
-          <button onClick={handleCollect} disabled={collecting}>
-            {collecting ? '🔄 Collecting...' : '🔄 Collect Now'}
-          </button>
+          
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <select 
+              value={statusFilter} 
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0); // Reset to first page when filter changes
+              }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">⏳ Pending</option>
+              <option value="analyzed">🔍 Analyzed</option>
+              <option value="archived">📦 Archived</option>
+              <option value="resolved">✅ Resolved</option>
+            </select>
+            
+            <button onClick={handleCollect} disabled={collecting}>
+              {collecting ? '🔄 Collecting...' : '🔄 Collect Now'}
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -119,14 +159,18 @@ export default function Dashboard() {
                   <th>Database</th>
                   <th>Status</th>
                   <th>Priority</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {queries.map((query) => (
-                  <tr key={query.id} onClick={() => window.location.href = `/query/${query.id}`}>
+                  <tr key={query.id}>
                     <td>{query.id}</td>
-                    <td>
-                      <code style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '500px' }}>
+                    <td 
+                      onClick={() => window.location.href = `/query/${query.id}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <code style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px' }}>
                         {query.sql_text}
                       </code>
                     </td>
@@ -134,14 +178,56 @@ export default function Dashboard() {
                     <td>{query.rows_examined.toLocaleString()}</td>
                     <td>{query.database_name}</td>
                     <td>
-                      <span className={`badge ${query.analyzed ? 'analyzed' : 'pending'}`}>
-                        {query.analyzed ? 'Analyzed' : 'Pending'}
-                      </span>
+                      <StatusBadge status={query.status} size="small" />
                     </td>
                     <td>
                       <span className={`badge ${getPriorityBadge(query.query_time)}`}>
                         {getPriorityBadge(query.query_time).toUpperCase()}
                       </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        {query.status !== 'archived' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusChange(query.id, 'archived');
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              backgroundColor: '#95a5a6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer'
+                            }}
+                            title="Archive query"
+                          >
+                            📦
+                          </button>
+                        )}
+                        {query.status !== 'resolved' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusChange(query.id, 'resolved');
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              backgroundColor: '#27ae60',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer'
+                            }}
+                            title="Mark as resolved"
+                          >
+                            ✅
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

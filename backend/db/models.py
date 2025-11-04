@@ -2,7 +2,7 @@
 Simple SQLite database models for storing collected queries and analysis.
 No multi-tenancy, no complex relationships - just the essentials.
 """
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, Boolean, Index, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -39,8 +39,21 @@ class SlowQuery(Base):
     analyzed = Column(Boolean, default=False)
     analysis_result_id = Column(Integer, nullable=True)
     
+    # Status workflow: pending -> analyzed/archived/resolved
+    status = Column(String(20), nullable=False, default='pending', index=True)
+    # pending: just collected, needs review
+    # analyzed: analysis completed, waiting for action
+    # archived: marked as not interesting
+    # resolved: issue fixed or acknowledged as OK
+    
+    # Unique constraint to prevent duplicates (same query at same time)
+    __table_args__ = (
+        UniqueConstraint('sql_fingerprint', 'start_time', name='uq_query_time'),
+        Index('idx_status_collected', 'status', 'collected_at'),
+    )
+    
     def __repr__(self):
-        return f"<SlowQuery(id={self.id}, time={self.query_time}s, analyzed={self.analyzed})>"
+        return f"<SlowQuery(id={self.id}, time={self.query_time}s, status={self.status})>"
 
 
 class AnalysisResult(Base):
