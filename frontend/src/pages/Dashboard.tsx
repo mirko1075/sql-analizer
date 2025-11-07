@@ -12,6 +12,16 @@ export default function Dashboard() {
   const [hasMore, setHasMore] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  
+  // Advanced filters
+  const [sqlSearchFilter, setSqlSearchFilter] = useState('');
+  const [minQueryTime, setMinQueryTime] = useState('');
+  const [maxQueryTime, setMaxQueryTime] = useState('');
+  const [minRowsExamined, setMinRowsExamined] = useState('');
+  const [maxRowsExamined, setMaxRowsExamined] = useState('');
+  const [databaseFilter, setDatabaseFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const pageSize = 50;
 
@@ -76,6 +86,60 @@ export default function Dashboard() {
     return 'low';
   };
 
+  // Filter queries based on all active filters
+  const filteredQueries = queries.filter(query => {
+    // SQL search filter
+    if (sqlSearchFilter && !query.sql_text.toLowerCase().includes(sqlSearchFilter.toLowerCase())) {
+      return false;
+    }
+    
+    // Query time range filter
+    if (minQueryTime && query.query_time < parseFloat(minQueryTime)) {
+      return false;
+    }
+    if (maxQueryTime && query.query_time > parseFloat(maxQueryTime)) {
+      return false;
+    }
+    
+    // Rows examined range filter
+    if (minRowsExamined && query.rows_examined < parseInt(minRowsExamined)) {
+      return false;
+    }
+    if (maxRowsExamined && query.rows_examined > parseInt(maxRowsExamined)) {
+      return false;
+    }
+    
+    // Database filter
+    if (databaseFilter && query.database_name !== databaseFilter) {
+      return false;
+    }
+    
+    // Priority filter
+    if (priorityFilter && getPriorityBadge(query.query_time) !== priorityFilter) {
+      return false;
+    }
+    
+    return true;
+  });
+
+  // Get unique databases for filter dropdown
+  const uniqueDatabases = Array.from(new Set(queries.map(q => q.database_name).filter(Boolean)));
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSqlSearchFilter('');
+    setMinQueryTime('');
+    setMaxQueryTime('');
+    setMinRowsExamined('');
+    setMaxRowsExamined('');
+    setDatabaseFilter('');
+    setPriorityFilter('');
+  };
+
+  // Check if any filter is active
+  const hasActiveFilters = sqlSearchFilter || minQueryTime || maxQueryTime || 
+    minRowsExamined || maxRowsExamined || databaseFilter || priorityFilter;
+
   return (
     <div className="container">
       <header>
@@ -114,20 +178,48 @@ export default function Dashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
           <h2>Slow Queries</h2>
           
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: showFilters ? '2px solid #3498db' : '1px solid #ddd',
+                backgroundColor: showFilters ? '#ebf5fb' : 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: showFilters ? '#3498db' : '#333',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              🔍 Filters {hasActiveFilters && <span style={{ 
+                backgroundColor: '#3498db', 
+                color: 'white', 
+                borderRadius: '10px', 
+                padding: '2px 6px', 
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}>ON</span>}
+            </button>
+
             <select 
               value={statusFilter} 
               onChange={(e) => {
                 setStatusFilter(e.target.value);
-                setPage(0); // Reset to first page when filter changes
+                setPage(0);
               }}
               style={{
                 padding: '8px 12px',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 border: '1px solid #ddd',
                 backgroundColor: 'white',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '14px',
+                fontWeight: '500'
               }}
             >
               <option value="">All Statuses</option>
@@ -137,16 +229,245 @@ export default function Dashboard() {
               <option value="resolved">✅ Resolved</option>
             </select>
             
-            <button onClick={handleCollect} disabled={collecting}>
+            <button 
+              onClick={handleCollect} 
+              disabled={collecting}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: collecting ? '#95a5a6' : '#3498db',
+                color: 'white',
+                cursor: collecting ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'background-color 0.2s ease'
+              }}
+            >
               {collecting ? '🔄 Collecting...' : '🔄 Collect Now'}
             </button>
           </div>
         </div>
 
+        {/* Advanced Filters Panel */}
+        {showFilters && (
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px',
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #e9ecef',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#2c3e50' }}>
+                🎯 Advanced Filters
+              </h3>
+              {hasActiveFilters && (
+                <button
+                  onClick={resetFilters}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    backgroundColor: '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  ✖ Clear All
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+              {/* SQL Search */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  🔎 SQL Query Search
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search in SQL text..."
+                  value={sqlSearchFilter}
+                  onChange={(e) => setSqlSearchFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+
+              {/* Database Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  🗄️ Database
+                </label>
+                <select
+                  value={databaseFilter}
+                  onChange={(e) => setDatabaseFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">All Databases</option>
+                  {uniqueDatabases.map(db => (
+                    <option key={db} value={db}>{db}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Priority Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  ⚡ Priority
+                </label>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">All Priorities</option>
+                  <option value="critical">🔴 Critical</option>
+                  <option value="high">🟠 High</option>
+                  <option value="medium">🟡 Medium</option>
+                  <option value="low">🟢 Low</option>
+                </select>
+              </div>
+
+              {/* Query Time Min */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  ⏱️ Min Query Time (s)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 1.5"
+                  step="0.1"
+                  value={minQueryTime}
+                  onChange={(e) => setMinQueryTime(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+
+              {/* Query Time Max */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  ⏱️ Max Query Time (s)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 10"
+                  step="0.1"
+                  value={maxQueryTime}
+                  onChange={(e) => setMaxQueryTime(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+
+              {/* Rows Examined Min */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  📊 Min Rows Examined
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 1000"
+                  value={minRowsExamined}
+                  onChange={(e) => setMinRowsExamined(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+
+              {/* Rows Examined Max */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  📊 Max Rows Examined
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 100000"
+                  value={maxRowsExamined}
+                  onChange={(e) => setMaxRowsExamined(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ 
+              marginTop: '16px', 
+              padding: '12px', 
+              backgroundColor: '#e8f4f8',
+              borderRadius: '6px',
+              fontSize: '13px',
+              color: '#2c3e50'
+            }}>
+              <strong>📈 Results:</strong> Showing {filteredQueries.length} of {queries.length} queries
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="loading">Loading queries...</div>
-        ) : queries.length === 0 ? (
-          <div className="loading">No slow queries found. Run the simulator to generate test data.</div>
+        ) : filteredQueries.length === 0 ? (
+          <div className="loading">
+            {queries.length === 0 
+              ? 'No slow queries found. Run the simulator to generate test data.'
+              : 'No queries match the current filters. Try adjusting your search criteria.'}
+          </div>
         ) : (
           <>
             <table>
@@ -163,7 +484,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {queries.map((query) => (
+                {filteredQueries.map((query) => (
                   <tr key={query.id}>
                     <td>{query.id}</td>
                     <td 
