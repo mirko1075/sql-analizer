@@ -26,16 +26,30 @@ async def list_slow_queries(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
     analyzed: Optional[bool] = None,
-    status: Optional[str] = Query(None, regex="^(pending|analyzed|archived|resolved)$")
+    status: Optional[str] = Query(None, regex="^(pending|analyzed|archived|resolved)$"),
+    query_text: Optional[str] = Query(None, description="Search in SQL query text"),
+    database: Optional[str] = Query(None, description="Filter by database name"),
+    priority: Optional[str] = Query(None, regex="^(low|medium|high|critical)$", description="Filter by priority"),
+    min_query_time: Optional[float] = Query(None, ge=0, description="Minimum query time in seconds"),
+    max_query_time: Optional[float] = Query(None, ge=0, description="Maximum query time in seconds"),
+    min_rows_examined: Optional[int] = Query(None, ge=0, description="Minimum rows examined"),
+    max_rows_examined: Optional[int] = Query(None, ge=0, description="Maximum rows examined")
 ) -> Dict[str, Any]:
     """
-    List all collected slow queries with pagination.
+    List all collected slow queries with pagination and filtering.
     
     Query Parameters:
         skip: Number of records to skip (default: 0)
         limit: Number of records to return (default: 50, max: 500)
         analyzed: Filter by analyzed status (optional, deprecated - use status instead)
         status: Filter by status: pending, analyzed, archived, resolved (optional)
+        query_text: Search in SQL query text (case-insensitive, partial match)
+        database: Filter by database name (exact match)
+        priority: Filter by priority: low, medium, high, critical (based on query_time)
+        min_query_time: Minimum query execution time in seconds
+        max_query_time: Maximum query execution time in seconds
+        min_rows_examined: Minimum number of rows examined
+        max_rows_examined: Maximum number of rows examined
     
     Returns:
         Dictionary with queries list and pagination info
@@ -55,6 +69,37 @@ async def list_slow_queries(
         # Default: show only pending and analyzed (not archived/resolved)
         else:
             query = query.filter(SlowQuery.status.in_(['pending', 'analyzed']))
+        
+        # SQL text search filter
+        if query_text:
+            query = query.filter(SlowQuery.sql_text.ilike(f"%{query_text}%"))
+        
+        # Database filter
+        if database:
+            query = query.filter(SlowQuery.database_name == database)
+        
+        # Query time range filters
+        if min_query_time is not None:
+            query = query.filter(SlowQuery.query_time >= min_query_time)
+        if max_query_time is not None:
+            query = query.filter(SlowQuery.query_time <= max_query_time)
+        
+        # Rows examined range filters
+        if min_rows_examined is not None:
+            query = query.filter(SlowQuery.rows_examined >= min_rows_examined)
+        if max_rows_examined is not None:
+            query = query.filter(SlowQuery.rows_examined <= max_rows_examined)
+        
+        # Priority filter (based on query_time thresholds)
+        if priority:
+            if priority == "critical":
+                query = query.filter(SlowQuery.query_time > 5.0)
+            elif priority == "high":
+                query = query.filter(SlowQuery.query_time > 2.0, SlowQuery.query_time <= 5.0)
+            elif priority == "medium":
+                query = query.filter(SlowQuery.query_time > 1.0, SlowQuery.query_time <= 2.0)
+            elif priority == "low":
+                query = query.filter(SlowQuery.query_time <= 1.0)
         
         # Get total count
         total = query.count()

@@ -70,10 +70,33 @@ export interface Stats {
 }
 
 // API methods
-export const getSlowQueries = (skip = 0, limit = 50, analyzed?: boolean, status?: string) => {
+export const getSlowQueries = (
+  skip = 0,
+  limit = 50,
+  filters?: {
+    analyzed?: boolean;
+    status?: string;
+    query_text?: string;
+    database?: string;
+    priority?: string;
+    min_query_time?: number;
+    max_query_time?: number;
+    min_rows_examined?: number;
+    max_rows_examined?: number;
+  }
+) => {
   const params: any = { skip, limit };
-  if (analyzed !== undefined) params.analyzed = analyzed;
-  if (status) params.status = status;
+  if (filters) {
+    if (filters.analyzed !== undefined) params.analyzed = filters.analyzed;
+    if (filters.status) params.status = filters.status;
+    if (filters.query_text) params.query_text = filters.query_text;
+    if (filters.database) params.database = filters.database;
+    if (filters.priority) params.priority = filters.priority;
+    if (filters.min_query_time !== undefined) params.min_query_time = filters.min_query_time;
+    if (filters.max_query_time !== undefined) params.max_query_time = filters.max_query_time;
+    if (filters.min_rows_examined !== undefined) params.min_rows_examined = filters.min_rows_examined;
+    if (filters.max_rows_examined !== undefined) params.max_rows_examined = filters.max_rows_examined;
+  }
   return api.get<QueryListResponse>('/slow-queries', { params });
 };
 

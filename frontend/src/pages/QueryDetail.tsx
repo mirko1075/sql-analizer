@@ -163,40 +163,8 @@ export default function QueryDetail() {
         <pre>{query.sql_text}</pre>
       </div>
 
-      {/* Analysis Section */}
-      {!query.analyzed ? (
-        <div className="card">
-          <h2>🧠 AI Analysis</h2>
-          <p>This query has not been analyzed with AI yet.</p>
-          <p style={{ marginTop: '12px', fontSize: '0.9em', color: '#7f8c8d' }}>
-            Click the button below to start an interactive AI analysis. 
-            The AI will examine the query and may request additional data from the database to provide comprehensive optimization recommendations.
-          </p>
-          <button 
-            onClick={handleAnalyze} 
-            disabled={analyzingAI} 
-            style={{ 
-              marginTop: '16px',
-              padding: '12px 24px',
-              fontSize: '16px',
-              backgroundColor: analyzingAI ? '#95a5a6' : '#3498db',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: analyzingAI ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {analyzingAI ? '⏳ Analyzing with AI... (This may take 30-60 seconds)' : '🤖 Analyze with AI'}
-          </button>
-          {analyzingAI && (
-            <div style={{ marginTop: '16px', padding: '12px', background: '#f0f8ff', borderRadius: '6px', fontSize: '0.9em' }}>
-              <div>🔄 Running enhanced rule-based analysis (20+ rules)...</div>
-              <div>🤖 AI is analyzing the query and may request additional database information...</div>
-              <div>💡 The AI can execute SELECT queries to gather statistics and schema details...</div>
-            </div>
-          )}
-        </div>
-      ) : analysis ? (
+      {/* Rule-Based Analysis (Always shown if available) */}
+      {analysis && (analysis.issues?.length > 0 || analysis.suggested_indexes?.length > 0) && (
         <>
           {/* Issues Found */}
           <div className="card">
@@ -239,7 +207,7 @@ export default function QueryDetail() {
               {analysis.suggested_indexes.map((index, idx) => (
                 <div key={idx} style={{ marginBottom: '16px' }}>
                   <div style={{ marginBottom: '4px' }}>
-                    <strong>Table:</strong> <code>{index.table}</code> | 
+                    <strong>Table:</strong> <code>{index.table}</code> |
                     <strong> Column:</strong> <code>{index.column}</code>
                   </div>
                   <pre>{index.statement}</pre>
@@ -247,28 +215,62 @@ export default function QueryDetail() {
               ))}
             </div>
           )}
-
-          {/* AI Analysis */}
-          <div className="card">
-            <h2>🧠 AI Analysis (LLaMA {analysis.analyzed_at && `- ${new Date(analysis.analyzed_at).toLocaleString()})`}</h2>
-            <div style={{ 
-              whiteSpace: 'pre-wrap',
-              lineHeight: '1.6',
-              padding: '16px',
-              background: '#f8f9fa',
-              borderRadius: '6px'
-            }}>
-              {analysis.ai_analysis}
-            </div>
-            <div style={{ marginTop: '16px', color: '#7f8c8d', fontSize: '0.9em' }}>
-              Analysis completed in {analysis.analysis_duration?.toFixed(2)}s
-            </div>
-          </div>
         </>
+      )}
+
+      {/* AI Analysis Section (On-Demand) */}
+      {analysis && analysis.ai_analysis ? (
+        <div className="card">
+          <h2>🧠 AI Deep Analysis {analysis.analyzed_at && `- ${new Date(analysis.analyzed_at).toLocaleString()}`}</h2>
+          <div style={{
+            whiteSpace: 'pre-wrap',
+            lineHeight: '1.6',
+            padding: '16px',
+            background: '#f8f9fa',
+            borderRadius: '6px'
+          }}>
+            {analysis.ai_analysis}
+          </div>
+          <div style={{ marginTop: '16px', color: '#7f8c8d', fontSize: '0.9em' }}>
+            AI analysis completed in {analysis.analysis_duration?.toFixed(2)}s
+          </div>
+        </div>
+      ) : query.analyzed ? (
+        <div className="card">
+          <h2>🧠 AI Deep Analysis</h2>
+          <p>Rule-based analysis is complete. For deeper insights, run an AI analysis.</p>
+          <p style={{ marginTop: '12px', fontSize: '0.9em', color: '#7f8c8d' }}>
+            Click the button below to start an interactive AI analysis.
+            The AI will examine the query and may request additional data from the database to provide comprehensive optimization recommendations.
+          </p>
+          <button
+            onClick={handleAnalyze}
+            disabled={analyzingAI}
+            style={{
+              marginTop: '16px',
+              padding: '12px 24px',
+              fontSize: '16px',
+              backgroundColor: analyzingAI ? '#95a5a6' : '#3498db',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: analyzingAI ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {analyzingAI ? '⏳ Analyzing with AI... (This may take 30-60 seconds)' : '🤖 Analyze with AI'}
+          </button>
+          {analyzingAI && (
+            <div style={{ marginTop: '16px', padding: '12px', background: '#f0f8ff', borderRadius: '6px', fontSize: '0.9em' }}>
+              <div>🤖 AI is analyzing the query and may request additional database information...</div>
+              <div>💡 The AI can execute SELECT queries to gather statistics and schema details...</div>
+              <div>⏱️ This may take 30-60 seconds depending on query complexity...</div>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="card">
-          <h2>🧠 Analysis</h2>
-          <div className="loading">Loading analysis results...</div>
+          <h2>🔄 Analysis in Progress</h2>
+          <div className="loading">Analyzing query with rule-based analyzer...</div>
         </div>
       )}
     </div>

@@ -26,8 +26,52 @@ export default function Dashboard() {
   const pageSize = 50;
 
   useEffect(() => {
-    loadData();
-  }, [page, statusFilter]); // Reload when status filter changes
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [queriesRes, statsRes] = await Promise.all([
+          getSlowQueries(
+            page * pageSize,
+            pageSize,
+            {
+              status: statusFilter || undefined,
+              query_text: sqlSearchFilter || undefined,
+              database: databaseFilter || undefined,
+              priority: priorityFilter || undefined,
+              min_query_time: minQueryTime ? parseFloat(minQueryTime) : undefined,
+              max_query_time: maxQueryTime ? parseFloat(maxQueryTime) : undefined,
+              min_rows_examined: minRowsExamined ? parseInt(minRowsExamined) : undefined,
+              max_rows_examined: maxRowsExamined ? parseInt(maxRowsExamined) : undefined,
+            }
+          ),
+          getStats()
+        ]);
+
+        setQueries(queriesRes.data.queries);
+        setHasMore(queriesRes.data.has_more);
+        setStats(statsRes.data);
+      } catch (err: any) {
+        setError(err.response?.data?.detail || err.message || 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [
+    page,
+    statusFilter,
+    sqlSearchFilter,
+    databaseFilter,
+    priorityFilter,
+    minQueryTime,
+    maxQueryTime,
+    minRowsExamined,
+    maxRowsExamined,
+    pageSize
+  ]);
 
   const loadData = async () => {
     try {
@@ -35,7 +79,20 @@ export default function Dashboard() {
       setError(null);
 
       const [queriesRes, statsRes] = await Promise.all([
-        getSlowQueries(page * pageSize, pageSize, undefined, statusFilter || undefined),
+        getSlowQueries(
+          page * pageSize,
+          pageSize,
+          {
+            status: statusFilter || undefined,
+            query_text: sqlSearchFilter || undefined,
+            database: databaseFilter || undefined,
+            priority: priorityFilter || undefined,
+            min_query_time: minQueryTime ? parseFloat(minQueryTime) : undefined,
+            max_query_time: maxQueryTime ? parseFloat(maxQueryTime) : undefined,
+            min_rows_examined: minRowsExamined ? parseInt(minRowsExamined) : undefined,
+            max_rows_examined: maxRowsExamined ? parseInt(maxRowsExamined) : undefined,
+          }
+        ),
         getStats()
       ]);
 
@@ -86,42 +143,6 @@ export default function Dashboard() {
     return 'low';
   };
 
-  // Filter queries based on all active filters
-  const filteredQueries = queries.filter(query => {
-    // SQL search filter
-    if (sqlSearchFilter && !query.sql_text.toLowerCase().includes(sqlSearchFilter.toLowerCase())) {
-      return false;
-    }
-    
-    // Query time range filter
-    if (minQueryTime && query.query_time < parseFloat(minQueryTime)) {
-      return false;
-    }
-    if (maxQueryTime && query.query_time > parseFloat(maxQueryTime)) {
-      return false;
-    }
-    
-    // Rows examined range filter
-    if (minRowsExamined && query.rows_examined < parseInt(minRowsExamined)) {
-      return false;
-    }
-    if (maxRowsExamined && query.rows_examined > parseInt(maxRowsExamined)) {
-      return false;
-    }
-    
-    // Database filter
-    if (databaseFilter && query.database_name !== databaseFilter) {
-      return false;
-    }
-    
-    // Priority filter
-    if (priorityFilter && getPriorityBadge(query.query_time) !== priorityFilter) {
-      return false;
-    }
-    
-    return true;
-  });
-
   // Get unique databases for filter dropdown
   const uniqueDatabases = Array.from(new Set(queries.map(q => q.database_name).filter(Boolean)));
 
@@ -134,6 +155,7 @@ export default function Dashboard() {
     setMaxRowsExamined('');
     setDatabaseFilter('');
     setPriorityFilter('');
+    setPage(0); // Reset to first page
   };
 
   // Check if any filter is active
@@ -297,7 +319,10 @@ export default function Dashboard() {
                   type="text"
                   placeholder="Search in SQL text..."
                   value={sqlSearchFilter}
-                  onChange={(e) => setSqlSearchFilter(e.target.value)}
+                  onChange={(e) => {
+                    setSqlSearchFilter(e.target.value);
+                    setPage(0);
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -316,7 +341,10 @@ export default function Dashboard() {
                 </label>
                 <select
                   value={databaseFilter}
-                  onChange={(e) => setDatabaseFilter(e.target.value)}
+                  onChange={(e) => {
+                    setDatabaseFilter(e.target.value);
+                    setPage(0);
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -341,7 +369,10 @@ export default function Dashboard() {
                 </label>
                 <select
                   value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  onChange={(e) => {
+                    setPriorityFilter(e.target.value);
+                    setPage(0);
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -370,7 +401,10 @@ export default function Dashboard() {
                   placeholder="e.g., 1.5"
                   step="0.1"
                   value={minQueryTime}
-                  onChange={(e) => setMinQueryTime(e.target.value)}
+                  onChange={(e) => {
+                    setMinQueryTime(e.target.value);
+                    setPage(0);
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -392,7 +426,10 @@ export default function Dashboard() {
                   placeholder="e.g., 10"
                   step="0.1"
                   value={maxQueryTime}
-                  onChange={(e) => setMaxQueryTime(e.target.value)}
+                  onChange={(e) => {
+                    setMaxQueryTime(e.target.value);
+                    setPage(0);
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -413,7 +450,10 @@ export default function Dashboard() {
                   type="number"
                   placeholder="e.g., 1000"
                   value={minRowsExamined}
-                  onChange={(e) => setMinRowsExamined(e.target.value)}
+                  onChange={(e) => {
+                    setMinRowsExamined(e.target.value);
+                    setPage(0);
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -434,7 +474,10 @@ export default function Dashboard() {
                   type="number"
                   placeholder="e.g., 100000"
                   value={maxRowsExamined}
-                  onChange={(e) => setMaxRowsExamined(e.target.value)}
+                  onChange={(e) => {
+                    setMaxRowsExamined(e.target.value);
+                    setPage(0);
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -455,18 +498,18 @@ export default function Dashboard() {
               fontSize: '13px',
               color: '#2c3e50'
             }}>
-              <strong>📈 Results:</strong> Showing {filteredQueries.length} of {queries.length} queries
+              <strong>📈 Results:</strong> Showing {queries.length} queries {hasActiveFilters && '(filtered)'}
             </div>
           </div>
         )}
 
         {loading ? (
           <div className="loading">Loading queries...</div>
-        ) : filteredQueries.length === 0 ? (
+        ) : queries.length === 0 ? (
           <div className="loading">
-            {queries.length === 0 
-              ? 'No slow queries found. Run the simulator to generate test data.'
-              : 'No queries match the current filters. Try adjusting your search criteria.'}
+            {hasActiveFilters 
+              ? 'No queries match the current filters. Try adjusting your search criteria.'
+              : 'No slow queries found. Run the simulator to generate test data.'}
           </div>
         ) : (
           <>
@@ -484,7 +527,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filteredQueries.map((query) => (
+                {queries.map((query) => (
                   <tr key={query.id}>
                     <td>{query.id}</td>
                     <td 

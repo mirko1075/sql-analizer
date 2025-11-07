@@ -1,15 +1,17 @@
 """
 MySQL Slow Query Collector.
 Reads from mysql.slow_log table and stores in local database.
+Automatically runs rule-based analysis on new queries.
 """
 import mysql.connector
 import hashlib
+import json
 from datetime import datetime
 from typing import List, Dict, Any
 
 from core.config import settings
 from core.logger import setup_logger
-from db.models import SlowQuery, get_db
+from db.models import SlowQuery, AnalysisResult, get_db
 
 logger = setup_logger(__name__, settings.log_level)
 
@@ -18,16 +20,84 @@ def generate_fingerprint(sql: str) -> str:
     """
     Generate a fingerprint (hash) for SQL query.
     Used to group similar queries together.
-    
+
     Args:
         sql: SQL query text
-    
+
     Returns:
         MD5 hash of normalized query
     """
     # Simple normalization: lowercase and remove extra spaces
     normalized = ' '.join(sql.lower().split())
     return hashlib.md5(normalized.encode()).hexdigest()
+
+
+def auto_analyze_rules(query_id: int, sql_text: str, query_info: Dict[str, Any], db) -> bool:
+    """
+    Automatically run rule-based analysis on a newly collected query.
+    This is fast and provides immediate feedback without AI.
+
+    Args:
+        query_id: ID of the slow query
+        sql_text: SQL query text
+        query_info: Query performance metrics
+        db: Database session
+
+    Returns:
+        True if analysis was successful, False otherwise
+    """
+    try:
+        from services.enhanced_rules import QueryRuleAnalyzer
+        from services.analyzer import get_explain_plan
+
+        logger.info(f"🔍 Auto-analyzing query {query_id} with rules...")
+
+        start_time = datetime.utcnow()
+
+        # Get EXPLAIN plan
+        explain_plan = get_explain_plan(sql_text)
+
+        # Run enhanced rule analysis
+        rule_analyzer = QueryRuleAnalyzer()
+        rule_analysis = rule_analyzer.analyze(
+            sql=sql_text,
+            query_info=query_info,
+            explain_plan=explain_plan
+        )
+
+        analysis_duration = (datetime.utcnow() - start_time).total_seconds()
+
+        # Create analysis result
+        analysis_result = AnalysisResult(
+            slow_query_id=query_id,
+            issues_found=json.dumps(rule_analysis["issues"]),
+            suggested_indexes=json.dumps(rule_analysis["suggested_indexes"]),
+            improvement_priority=rule_analysis["priority"],
+            analyzed_at=datetime.utcnow(),
+            analysis_duration=analysis_duration
+        )
+
+        db.add(analysis_result)
+
+        # Update query
+        slow_query = db.query(SlowQuery).filter(SlowQuery.id == query_id).first()
+        if slow_query:
+            slow_query.analyzed = True
+            slow_query.analysis_result_id = analysis_result.id
+            slow_query.status = 'analyzed'
+
+        logger.info(
+            f"✅ Auto-analysis complete for query {query_id}: "
+            f"{len(rule_analysis['issues'])} issues, "
+            f"priority {rule_analysis['priority']}, "
+            f"{analysis_duration:.3f}s"
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Auto-analysis failed for query {query_id}: {e}")
+        return False
 
 
 def collect_slow_queries() -> Dict[str, Any]:
@@ -131,10 +201,21 @@ def collect_slow_queries() -> Dict[str, Any]:
                 collected_at=datetime.utcnow(),
                 status='pending'  # New queries start as pending
             )
-            
+
             db.add(slow_query)
+            db.flush()  # Flush to get the ID for auto-analysis
+
+            # Auto-analyze with rules immediately
+            query_info = {
+                "query_time": query_time_seconds,
+                "lock_time": lock_time_seconds,
+                "rows_examined": int(row['rows_examined']) if row['rows_examined'] else 0,
+                "rows_sent": int(row['rows_sent']) if row['rows_sent'] else 0,
+            }
+            auto_analyze_rules(slow_query.id, sql_text, query_info, db)
+
             collected_count += 1
-        
+
         db.commit()
         cursor.close()
         conn.close()
