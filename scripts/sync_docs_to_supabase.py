@@ -1,24 +1,16 @@
-import os
-import glob
-import time
+import os, glob, json, time, requests
 from openai import OpenAI
-from supabase import create_client
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def embed_text(text: str, retries: int = 2, delay: float = 2.0):
-    """Crea embedding con retry automatico"""
+def embed_text(text: str, retries=2, delay=2.0):
     for attempt in range(retries + 1):
         try:
-            resp = client.embeddings.create(
-                model="text-embedding-3-small",
-                input=text
-            )
+            resp = client.embeddings.create(model="text-embedding-3-small", input=text)
             return resp.data[0].embedding
         except Exception as e:
             if attempt < retries:
@@ -28,12 +20,17 @@ def embed_text(text: str, retries: int = 2, delay: float = 2.0):
                 raise
 
 def chunk_text(text: str, size: int = 800, overlap: int = 100):
-    """Divide il testo in blocchi con overlap"""
     words = text.split()
     for i in range(0, len(words), size - overlap):
         yield " ".join(words[i:i + size])
 
-# Trova tutti i file Markdown nel progetto
+headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "resolution=merge-duplicates"
+}
+
 paths = [
     p for p in glob.glob("**/*.md", recursive=True)
     if "node_modules" not in p and "venv" not in p and "dist" not in p
@@ -41,7 +38,6 @@ paths = [
 
 print(f"📚 Found {len(paths)} markdown files to sync.\n")
 
-total_chunks = 0
 uploaded = 0
 errors = 0
 
@@ -49,47 +45,40 @@ for path in paths:
     try:
         with open(path, "r") as f:
             content = f.read()
-
         file_name = os.path.basename(path)
         chunks = list(chunk_text(content))
         print(f"→ Syncing {file_name} ({len(chunks)} chunks)")
 
         # Cancella i vecchi chunk dello stesso file
-        supabase.table("project_docs").delete().eq("file_name", file_name).execute()
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/project_docs?file_name=eq.{file_name}",
+            headers=headers
+        )
 
         for i, chunk in enumerate(chunks):
-            try:
-                embedding = embed_text(chunk)
-                data = {
-                    "id": f"{path}_{i}",
-                    "file_name": file_name,
-                    "chunk_index": i,
-                    "content": chunk,
-                    "embedding": embedding,
-                }
-
-                for attempt in range(2):  # 2 tentativi per Supabase
-                    try:
-                        supabase.table("project_docs").insert(data).execute()
-                        uploaded += 1
-                        total_chunks += 1
-                        break
-                    except Exception as e:
-                        if attempt == 0:
-                            print(f"   ⚠️ Supabase retry: {e}")
-                            time.sleep(1)
-                        else:
-                            raise
-
-            except Exception as e:
-                print(f"   ❌ Chunk {i} failed: {e}")
+            embedding = embed_text(chunk)
+            data = {
+                "id": f"{path}_{i}",
+                "file_name": file_name,
+                "chunk_index": i,
+                "content": chunk,
+                "embedding": embedding,
+            }
+            res = requests.post(
+                f"{SUPABASE_URL}/rest/v1/project_docs",
+                headers=headers,
+                data=json.dumps(data)
+            )
+            if res.status_code not in (200, 201):
+                print(f"   ❌ Upload failed ({res.status_code}): {res.text}")
                 errors += 1
+            else:
+                uploaded += 1
 
     except Exception as e:
-        print(f"❌ Error processing file {path}: {e}")
+        print(f"❌ Error processing {path}: {e}")
         errors += 1
 
 print("\n✅ Sync completed.")
-print(f"   Files processed: {len(paths)}")
-print(f"   Chunks uploaded: {uploaded}")
-print(f"   Total errors: {errors}")
+print(f"   Uploaded chunks: {uploaded}")
+print(f"   Errors: {errors}")
