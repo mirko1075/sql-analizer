@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { 
-  getSlowQuery, 
-  getAIAnalysis, 
-  updateQueryStatus, 
+import {
+  getSlowQuery,
+  getAnalysis,
+  getAIAnalysis,
+  updateQueryStatus,
   analyzeWithAI,
-  type SlowQuery, 
-  type AnalysisResult 
+  type SlowQuery,
+  type AnalysisResult
 } from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
@@ -32,13 +33,20 @@ export default function QueryDetail() {
       const queryRes = await getSlowQuery(queryId);
       setQuery(queryRes.data);
 
-      // If already analyzed, load analysis
+      // If already analyzed, load analysis (rule-based + AI if available)
       if (queryRes.data.analyzed) {
         try {
-          const analysisRes = await getAIAnalysis(queryId);
+          const analysisRes = await getAnalysis(queryId);
           setAnalysis(analysisRes.data);
         } catch (err) {
           console.error('Failed to load analysis:', err);
+          // If /analyze endpoint fails, try /ai/analysis as fallback
+          try {
+            const aiAnalysisRes = await getAIAnalysis(queryId);
+            setAnalysis(aiAnalysisRes.data);
+          } catch (aiErr) {
+            console.error('Failed to load AI analysis:', aiErr);
+          }
         }
       }
     } catch (err: any) {

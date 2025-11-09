@@ -294,11 +294,65 @@ async def archive_query(query_id: int) -> Dict[str, Any]:
 async def resolve_query(query_id: int) -> Dict[str, Any]:
     """
     Quick endpoint to resolve a query (mark as fixed/acknowledged).
-    
+
     Path Parameters:
         query_id: ID of the slow query
-    
+
     Returns:
         Confirmation message
     """
     return await update_query_status(query_id, StatusUpdate(status='resolved'))
+
+
+@router.post("/cleanup/agent-queries")
+async def cleanup_agent_queries() -> Dict[str, Any]:
+    """
+    Clean up queries from the monitoring agent (EXPLAIN, DESCRIBE, SHOW, etc.).
+    This removes queries that are part of the analysis process, not actual application queries.
+
+    Returns:
+        Count of deleted queries
+    """
+    try:
+        db = next(get_db())
+
+        # Patterns to match agent queries
+        agent_patterns = [
+            'EXPLAIN%',
+            'DESCRIBE%',
+            'DESC %',
+            'SHOW INDEX%',
+            'SHOW TABLE STATUS%',
+            'SHOW FULL PROCESSLIST%',
+            'SHOW TABLES%',
+            'SHOW DATABASES%',
+            '%FROM mysql.slow_log%',
+            '%mysql.slow_log%',
+            'SELECT SLEEP%'
+        ]
+
+        deleted_count = 0
+        for pattern in agent_patterns:
+            queries_to_delete = db.query(SlowQuery).filter(SlowQuery.sql_text.like(pattern)).all()
+            for query in queries_to_delete:
+                # Also delete associated analysis results
+                if query.analysis_result_id:
+                    from db.models import AnalysisResult
+                    analysis = db.query(AnalysisResult).filter(AnalysisResult.id == query.analysis_result_id).first()
+                    if analysis:
+                        db.delete(analysis)
+                db.delete(query)
+                deleted_count += 1
+
+        db.commit()
+
+        logger.info(f"🧹 Cleaned up {deleted_count} agent queries from database")
+
+        return {
+            "deleted": deleted_count,
+            "message": f"Removed {deleted_count} agent/monitoring queries from database"
+        }
+
+    except Exception as e:
+        logger.error(f"Error cleaning up agent queries: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

@@ -124,9 +124,9 @@ def collect_slow_queries() -> Dict[str, Any]:
         logger.info(f"📅 Collecting queries since: {last_timestamp}")
         
         # Query slow_log for new entries, excluding DBPower monitoring user, SLEEP queries, and self-referencing queries
-        # We collect application queries but exclude the collector's own queries to slow_log
+        # We collect application queries but exclude the collector's own queries and analysis queries
         query = """
-        SELECT 
+        SELECT
             start_time,
             user_host,
             query_time,
@@ -141,6 +141,14 @@ def collect_slow_queries() -> Dict[str, Any]:
           AND sql_text NOT LIKE 'SELECT SLEEP%%'
           AND sql_text NOT LIKE '%%FROM mysql.slow_log%%'
           AND sql_text NOT LIKE '%%mysql.slow_log%%'
+          AND sql_text NOT LIKE 'EXPLAIN%%'
+          AND sql_text NOT LIKE 'DESCRIBE%%'
+          AND sql_text NOT LIKE 'DESC %%'
+          AND sql_text NOT LIKE 'SHOW INDEX%%'
+          AND sql_text NOT LIKE 'SHOW TABLE STATUS%%'
+          AND sql_text NOT LIKE 'SHOW FULL PROCESSLIST%%'
+          AND sql_text NOT LIKE 'SHOW TABLES%%'
+          AND sql_text NOT LIKE 'SHOW DATABASES%%'
         ORDER BY query_time DESC
         LIMIT 100
         """
