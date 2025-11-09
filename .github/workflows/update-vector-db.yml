@@ -14,15 +14,12 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    environment: staging
+    environment:
+      name: staging
+      url: https://ezezqplwfugnpxfkeyev.supabase.co
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Debug URL and Keys
-        run: |
-          echo "SUPABASE_URL=$SUPABASE_URL"
-          echo "SUPABASE_KEY length=${#SUPABASE_KEY}"
-          echo "OPENAI_API_KEY length=${#OPENAI_API_KEY}"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,8 +27,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          pip install openai supabase tiktoken python-dotenv
+        run: pip install openai requests tiktoken python-dotenv
 
       - name: Sync docs to Supabase
         env:
