@@ -11,7 +11,7 @@ from core.logger import setup_logger
 from db.models import init_db
 from services.collector import collect_slow_queries
 from services.ai import check_provider_health, get_ai_provider
-from api.routes import slow_queries, analyze, stats, ai_analysis
+from api.routes import slow_queries, analyze, stats, ai_analysis, context, ideas
 
 logger = setup_logger(__name__, settings.log_level)
 
@@ -97,6 +97,8 @@ app.include_router(slow_queries.router)
 app.include_router(analyze.router)
 app.include_router(stats.router)
 app.include_router(ai_analysis.router)
+app.include_router(context.router)
+app.include_router(ideas.router)
 
 
 @app.get("/")
