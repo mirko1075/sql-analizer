@@ -1,6 +1,9 @@
 name: Sync Docs to Supabase Vector DB
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
