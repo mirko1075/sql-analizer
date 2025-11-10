@@ -4,7 +4,7 @@ from typing import Any, Dict
 import os
 
 from .context import fetch_context_for_query
-import backend.core.clients as clients
+import core.clients as clients
 
 router = APIRouter()
 

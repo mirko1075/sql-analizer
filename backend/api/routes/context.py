@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
 from typing import Any, Dict, List
-import backend.core.clients as clients
+import core.clients as clients
 
 router = APIRouter()
 
