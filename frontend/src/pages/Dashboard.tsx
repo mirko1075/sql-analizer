@@ -1,335 +1,615 @@
-/**
- * Dashboard Page - Main overview of the AI Query Analyzer
- */
-import React, { useEffect, useState } from 'react';
-import {
-  Activity,
-  Database,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Zap,
-} from 'lucide-react';
-import { getStats, getCollectorStatus, getAnalyzerStatus, getHealth } from '../services/api';
-import type { StatsResponse, CollectorStatus, AnalyzerStatus, HealthStatus } from '../types';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { getSlowQueries, getStats, triggerCollection, archiveQuery, resolveQuery, type SlowQuery, type Stats } from '../services/api';
+import StatusBadge from '../components/StatusBadge';
 
-const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [collectorStatus, setCollectorStatus] = useState<CollectorStatus | null>(null);
-  const [analyzerStatus, setAnalyzerStatus] = useState<AnalyzerStatus | null>(null);
-  const [health, setHealth] = useState<HealthStatus | null>(null);
+export default function Dashboard() {
+  const [queries, setQueries] = useState<SlowQuery[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [collecting, setCollecting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  
+  // Advanced filters
+  const [sqlSearchFilter, setSqlSearchFilter] = useState('');
+  const [minQueryTime, setMinQueryTime] = useState('');
+  const [maxQueryTime, setMaxQueryTime] = useState('');
+  const [minRowsExamined, setMinRowsExamined] = useState('');
+  const [maxRowsExamined, setMaxRowsExamined] = useState('');
+  const [databaseFilter, setDatabaseFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const pageSize = 50;
 
   useEffect(() => {
-    loadDashboardData();
-    // Refresh every 30 seconds
-    const interval = setInterval(loadDashboardData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const loadDashboardData = async () => {
+        const [queriesRes, statsRes] = await Promise.all([
+          getSlowQueries(
+            page * pageSize,
+            pageSize,
+            {
+              status: statusFilter || undefined,
+              query_text: sqlSearchFilter || undefined,
+              database: databaseFilter || undefined,
+              priority: priorityFilter || undefined,
+              min_query_time: minQueryTime ? parseFloat(minQueryTime) : undefined,
+              max_query_time: maxQueryTime ? parseFloat(maxQueryTime) : undefined,
+              min_rows_examined: minRowsExamined ? parseInt(minRowsExamined) : undefined,
+              max_rows_examined: maxRowsExamined ? parseInt(maxRowsExamined) : undefined,
+            }
+          ),
+          getStats()
+        ]);
+
+        setQueries(queriesRes.data.queries);
+        setHasMore(queriesRes.data.has_more);
+        setStats(statsRes.data);
+      } catch (err: any) {
+        setError(err.response?.data?.detail || err.message || 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [
+    page,
+    statusFilter,
+    sqlSearchFilter,
+    databaseFilter,
+    priorityFilter,
+    minQueryTime,
+    maxQueryTime,
+    minRowsExamined,
+    maxRowsExamined,
+    pageSize
+  ]);
+
+  const loadData = async () => {
     try {
-      const [statsData, collectorData, analyzerData, healthData] = await Promise.all([
-        getStats(),
-        getCollectorStatus(),
-        getAnalyzerStatus(),
-        getHealth(),
+      setLoading(true);
+      setError(null);
+
+      const [queriesRes, statsRes] = await Promise.all([
+        getSlowQueries(
+          page * pageSize,
+          pageSize,
+          {
+            status: statusFilter || undefined,
+            query_text: sqlSearchFilter || undefined,
+            database: databaseFilter || undefined,
+            priority: priorityFilter || undefined,
+            min_query_time: minQueryTime ? parseFloat(minQueryTime) : undefined,
+            max_query_time: maxQueryTime ? parseFloat(maxQueryTime) : undefined,
+            min_rows_examined: minRowsExamined ? parseInt(minRowsExamined) : undefined,
+            max_rows_examined: maxRowsExamined ? parseInt(maxRowsExamined) : undefined,
+          }
+        ),
+        getStats()
       ]);
 
-      setStats(statsData);
-      setCollectorStatus(collectorData);
-      setAnalyzerStatus(analyzerData);
-      setHealth(healthData);
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
+      setQueries(queriesRes.data.queries);
+      setHasMore(queriesRes.data.has_more);
+      setStats(statsRes.data);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message || 'Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const getHealthStatusColor = (status: string) => {
-    switch (status) {
-      case 'healthy':
-        return 'text-green-600';
-      case 'degraded':
-        return 'text-yellow-600';
-      case 'unhealthy':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
+  const handleCollect = async () => {
+    setCollecting(true);
+    try {
+      await triggerCollection();
+      await loadData(); // Reload data after collection
+    } catch (err: any) {
+      alert('Collection failed: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setCollecting(false);
     }
   };
 
-  const getImprovementLevelColor = (level: string) => {
-    switch (level) {
-      case 'CRITICAL':
-        return 'bg-red-100 text-red-800';
-      case 'HIGH':
-        return 'bg-orange-100 text-orange-800';
-      case 'MEDIUM':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'LOW':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const handleStatusChange = async (queryId: number, newStatus: 'archived' | 'resolved') => {
+    try {
+      if (newStatus === 'archived') {
+        await archiveQuery(queryId);
+      } else {
+        await resolveQuery(queryId);
+      }
+      await loadData(); // Reload to update the list
+    } catch (err: any) {
+      alert('Status update failed: ' + (err.response?.data?.detail || err.message));
     }
   };
+
+  const formatTime = (seconds: number) => {
+    if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
+    return `${seconds.toFixed(2)}s`;
+  };
+
+  const getPriorityBadge = (queryTime: number) => {
+    if (queryTime > 5) return 'critical';
+    if (queryTime > 2) return 'high';
+    if (queryTime > 1) return 'medium';
+    return 'low';
+  };
+
+  // Get unique databases for filter dropdown
+  const uniqueDatabases = Array.from(new Set(queries.map(q => q.database_name).filter(Boolean)));
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSqlSearchFilter('');
+    setMinQueryTime('');
+    setMaxQueryTime('');
+    setMinRowsExamined('');
+    setMaxRowsExamined('');
+    setDatabaseFilter('');
+    setPriorityFilter('');
+    setPage(0); // Reset to first page
+  };
+
+  // Check if any filter is active
+  const hasActiveFilters = sqlSearchFilter || minQueryTime || maxQueryTime || 
+    minRowsExamined || maxRowsExamined || databaseFilter || priorityFilter;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">AI Query Analyzer Dashboard</h1>
-          <p className="mt-2 text-gray-600">
-            Monitor slow queries and optimization suggestions in real-time
-          </p>
+    <div className="container">
+      <header>
+        <h1>🧠 DBPower Base - LLaMA Edition</h1>
+        <p>AI-Powered MySQL Query Analyzer</p>
+      </header>
+
+      {error && <div className="error">Error: {error}</div>}
+
+      {stats && (
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-label">Total Queries</div>
+            <div className="stat-value">{stats.total_queries}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Analyzed</div>
+            <div className="stat-value" style={{ color: '#27ae60' }}>
+              {stats.analyzed_queries}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Pending</div>
+            <div className="stat-value" style={{ color: '#e67e22' }}>
+              {stats.pending_queries}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Avg Query Time</div>
+            <div className="stat-value">{formatTime(stats.average_query_time)}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+          <h2>Slow Queries</h2>
+          
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: showFilters ? '2px solid #3498db' : '1px solid #ddd',
+                backgroundColor: showFilters ? '#ebf5fb' : 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: showFilters ? '#3498db' : '#333',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              🔍 Filters {hasActiveFilters && <span style={{ 
+                backgroundColor: '#3498db', 
+                color: 'white', 
+                borderRadius: '10px', 
+                padding: '2px 6px', 
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}>ON</span>}
+            </button>
+
+            <select 
+              value={statusFilter} 
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);
+              }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">⏳ Pending</option>
+              <option value="analyzed">🔍 Analyzed</option>
+              <option value="archived">📦 Archived</option>
+              <option value="resolved">✅ Resolved</option>
+            </select>
+            
+            <button 
+              onClick={handleCollect} 
+              disabled={collecting}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: collecting ? '#95a5a6' : '#3498db',
+                color: 'white',
+                cursor: collecting ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'background-color 0.2s ease'
+              }}
+            >
+              {collecting ? '🔄 Collecting...' : '🔄 Collect Now'}
+            </button>
+          </div>
         </div>
 
-        {/* Health Status */}
-        {health && (
-          <div className="mb-6 p-4 bg-white rounded-lg shadow-md border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <CheckCircle className={getHealthStatusColor(health.status)} size={24} />
-                <div>
-                  <p className="font-semibold">System Status: {health.status.toUpperCase()}</p>
-                  <p className="text-sm text-gray-600">
-                    Uptime: {Math.floor(health.uptime_seconds / 3600)}h{' '}
-                    {Math.floor((health.uptime_seconds % 3600) / 60)}m
-                  </p>
-                </div>
+        {/* Advanced Filters Panel */}
+        {showFilters && (
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px',
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #e9ecef',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#2c3e50' }}>
+                🎯 Advanced Filters
+              </h3>
+              {hasActiveFilters && (
+                <button
+                  onClick={resetFilters}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    backgroundColor: '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  ✖ Clear All
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+              {/* SQL Search */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  🔎 SQL Query Search
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search in SQL text..."
+                  value={sqlSearchFilter}
+                  onChange={(e) => {
+                    setSqlSearchFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
               </div>
-              <div className="flex space-x-4">
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">Database</p>
-                  <p className={`font-semibold ${getHealthStatusColor(health.database.status)}`}>
-                    {health.database.status}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">Redis</p>
-                  <p className={`font-semibold ${getHealthStatusColor(health.redis.status)}`}>
-                    {health.redis.status}
-                  </p>
-                </div>
+
+              {/* Database Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  🗄️ Database
+                </label>
+                <select
+                  value={databaseFilter}
+                  onChange={(e) => {
+                    setDatabaseFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">All Databases</option>
+                  {uniqueDatabases.map(db => (
+                    <option key={db} value={db}>{db}</option>
+                  ))}
+                </select>
               </div>
+
+              {/* Priority Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  ⚡ Priority
+                </label>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => {
+                    setPriorityFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">All Priorities</option>
+                  <option value="critical">🔴 Critical</option>
+                  <option value="high">🟠 High</option>
+                  <option value="medium">🟡 Medium</option>
+                  <option value="low">🟢 Low</option>
+                </select>
+              </div>
+
+              {/* Query Time Min */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  ⏱️ Min Query Time (s)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 1.5"
+                  step="0.1"
+                  value={minQueryTime}
+                  onChange={(e) => {
+                    setMinQueryTime(e.target.value);
+                    setPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+
+              {/* Query Time Max */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  ⏱️ Max Query Time (s)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 10"
+                  step="0.1"
+                  value={maxQueryTime}
+                  onChange={(e) => {
+                    setMaxQueryTime(e.target.value);
+                    setPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+
+              {/* Rows Examined Min */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  📊 Min Rows Examined
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 1000"
+                  value={minRowsExamined}
+                  onChange={(e) => {
+                    setMinRowsExamined(e.target.value);
+                    setPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+
+              {/* Rows Examined Max */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#555' }}>
+                  📊 Max Rows Examined
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 100000"
+                  value={maxRowsExamined}
+                  onChange={(e) => {
+                    setMaxRowsExamined(e.target.value);
+                    setPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ 
+              marginTop: '16px', 
+              padding: '12px', 
+              backgroundColor: '#e8f4f8',
+              borderRadius: '6px',
+              fontSize: '13px',
+              color: '#2c3e50'
+            }}>
+              <strong>📈 Results:</strong> Showing {queries.length} queries {hasActiveFilters && '(filtered)'}
             </div>
           </div>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats && (
-            <>
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Queries</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.total_slow_queries}</p>
-                  </div>
-                  <Database className="text-primary-600" size={32} />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Analyzed</p>
-                    <p className="text-3xl font-bold text-green-600">
-                      {stats.total_analyzed}
-                    </p>
-                  </div>
-                  <CheckCircle className="text-green-600" size={32} />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Pending Analysis</p>
-                    <p className="text-3xl font-bold text-yellow-600">
-                      {stats.total_pending}
-                    </p>
-                  </div>
-                  <Clock className="text-yellow-600" size={32} />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Databases Monitored</p>
-                    <p className="text-3xl font-bold text-primary-600">
-                      {stats.databases_monitored}
-                    </p>
-                  </div>
-                  <TrendingUp className="text-primary-600" size={32} />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Improvement Level Distribution */}
-          {stats && (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <AlertTriangle className="mr-2 text-orange-600" size={24} />
-                Improvement Potential
-              </h2>
-              <div className="space-y-3">
-                {stats.improvement_summary.map((item) => (
-                  <div key={item.improvement_level} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className={`badge ${getImprovementLevelColor(item.improvement_level)}`}>{item.improvement_level}</span>
-                      <span className="text-sm text-gray-600">queries</span>
-                    </div>
-                    <span className="font-semibold text-gray-900">{item.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Top Tables */}
-          {stats && stats.top_tables.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <Database className="mr-2 text-primary-600" size={24} />
-                Top Impacted Tables
-              </h2>
-              <div className="space-y-3">
-                {stats.top_tables.map((table) => (
-                  <div key={`${table.source_db_type}-${table.table_name}`} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{table.table_name}</p>
-                      <p className="text-sm text-gray-600">
-                        {table.source_db_type.toUpperCase()} - Avg: {table.avg_duration_ms?.toFixed(2) || '0.00'}ms
-                      </p>
-                    </div>
-                    <span className="badge badge-info">{table.query_count} queries</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Collector Status */}
-        {collectorStatus && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Activity className="mr-2 text-primary-600" size={24} />
-              Collector Status
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">MySQL Collected</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {collectorStatus.mysql_total_collected}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Last run:{' '}
-                  {collectorStatus.mysql_last_run
-                    ? new Date(collectorStatus.mysql_last_run).toLocaleTimeString()
-                    : 'Never'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">PostgreSQL Collected</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {collectorStatus.postgres_total_collected}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Last run:{' '}
-                  {collectorStatus.postgres_last_run
-                    ? new Date(collectorStatus.postgres_last_run).toLocaleTimeString()
-                    : 'Never'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Analyzed</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {collectorStatus.total_analyzed}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Last run:{' '}
-                  {collectorStatus.analyzer_last_run
-                    ? new Date(collectorStatus.analyzer_last_run).toLocaleTimeString()
-                    : 'Never'}
-                </p>
-              </div>
-            </div>
-
-            {/* Scheduled Jobs */}
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-sm font-medium text-gray-700 mb-2">Scheduled Jobs:</p>
-              <div className="space-y-1">
-                {collectorStatus.jobs.map((job) => (
-                  <div key={job.id} className="flex justify-between text-sm">
-                    <span className="text-gray-600">{job.name}</span>
-                    <span className="text-gray-500">
-                      Next: {job.next_run ? new Date(job.next_run).toLocaleTimeString() : 'N/A'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+        {loading ? (
+          <div className="loading">Loading queries...</div>
+        ) : queries.length === 0 ? (
+          <div className="loading">
+            {hasActiveFilters 
+              ? 'No queries match the current filters. Try adjusting your search criteria.'
+              : 'No slow queries found. Run the simulator to generate test data.'}
           </div>
-        )}
+        ) : (
+          <>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>SQL Query</th>
+                  <th>Query Time</th>
+                  <th>Rows Examined</th>
+                  <th>Database</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queries.map((query) => (
+                  <tr key={query.id}>
+                    <td>{query.id}</td>
+                    <td 
+                      onClick={() => window.location.href = `/query/${query.id}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <code style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px' }}>
+                        {query.sql_text}
+                      </code>
+                    </td>
+                    <td>{formatTime(query.query_time)}</td>
+                    <td>{query.rows_examined.toLocaleString()}</td>
+                    <td>{query.database_name}</td>
+                    <td>
+                      <StatusBadge status={query.status} size="small" />
+                    </td>
+                    <td>
+                      <span className={`badge ${getPriorityBadge(query.query_time)}`}>
+                        {getPriorityBadge(query.query_time).toUpperCase()}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        {query.status !== 'archived' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusChange(query.id, 'archived');
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              backgroundColor: '#95a5a6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer'
+                            }}
+                            title="Archive query"
+                          >
+                            📦
+                          </button>
+                        )}
+                        {query.status !== 'resolved' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusChange(query.id, 'resolved');
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              backgroundColor: '#27ae60',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer'
+                            }}
+                            title="Mark as resolved"
+                          >
+                            ✅
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-        {/* Analyzer Status */}
-        {analyzerStatus && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Zap className="mr-2 text-yellow-600" size={24} />
-              Analyzer Status
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">High Impact</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {analyzerStatus.analyses.high_impact}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Medium Impact</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {analyzerStatus.analyses.medium_impact}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Low Impact</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {analyzerStatus.analyses.low_impact}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Analyses</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {analyzerStatus.analyses.total}
-                </p>
-              </div>
+            <div className="pagination">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
+                ← Previous
+              </button>
+              <span>Page {page + 1}</span>
+              <button onClick={() => setPage(p => p + 1)} disabled={!hasMore}>
+                Next →
+              </button>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
-};
-
-export default Dashboard;
+}
