@@ -1,0 +1,11 @@
+# DBPower Client Agent Dependencies
+
+# Database connectors
+mysql-connector-python==8.3.0
+psycopg2-binary==2.9.9
+
+# HTTP client
+requests==2.31.0
+
+# Utilities
+python-dotenv==1.0.0

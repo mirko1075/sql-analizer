@@ -1,0 +1,49 @@
+{
+  "agent_id": "my-company-agent-01",
+  "databases": [
+    {
+      "id": "production-mysql",
+      "type": "mysql",
+      "host": "mysql.company.local",
+      "port": 3306,
+      "database": "production",
+      "user": "dbpower_readonly",
+      "password": "secure_password",
+      "ssl": false,
+      "collection_interval": 60,
+      "slow_query_threshold": 1.0,
+      "organization_id": 1,
+      "team_id": 1,
+      "identity_id": 1
+    },
+    {
+      "id": "analytics-postgresql",
+      "type": "postgresql",
+      "host": "pg.company.local",
+      "port": 5432,
+      "database": "analytics",
+      "user": "dbpower_readonly",
+      "password": "secure_password",
+      "ssl": true,
+      "collection_interval": 120,
+      "slow_query_threshold": 2.0,
+      "organization_id": 1,
+      "team_id": 1,
+      "identity_id": 2
+    }
+  ],
+  "saas": {
+    "api_url": "https://api.dbpower.cloud/api/v1",
+    "api_key": "dbp_1_your-organization-api-key-here",
+    "verify_ssl": true,
+    "timeout": 30,
+    "retry_attempts": 3,
+    "retry_delay": 5
+  },
+  "anonymization_level": "strict",
+  "log_level": "INFO",
+  "health_check_interval": 300,
+  "health_check_port": 8080,
+  "cache_dir": "/var/lib/dbpower-agent/cache",
+  "max_cache_size_mb": 100
+}

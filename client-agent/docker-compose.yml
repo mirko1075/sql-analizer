@@ -1,0 +1,62 @@
+# DBPower Client Agent - Docker Compose
+version: '3.8'
+
+services:
+  client-agent:
+    build: .
+    container_name: dbpower-client-agent
+    restart: unless-stopped
+
+    environment:
+      # Agent Configuration
+      - CLIENT_AGENT_ID=my-company-agent-01
+      - LOG_LEVEL=INFO
+
+      # SaaS Backend Configuration
+      - SAAS_API_URL=https://api.dbpower.cloud/api/v1
+      - SAAS_API_KEY=dbp_1_your-api-key-here
+      - SAAS_VERIFY_SSL=true
+
+      # Anonymization Level (strict, moderate, minimal)
+      - ANONYMIZATION_LEVEL=strict
+
+      # Database Connections (JSON format)
+      - DB_CONNECTIONS=[
+          {
+            "id": "production-db",
+            "type": "mysql",
+            "host": "mysql.company.local",
+            "port": 3306,
+            "database": "production",
+            "user": "dbpower_readonly",
+            "password": "secure_password",
+            "collection_interval": 60,
+            "slow_query_threshold": 1.0,
+            "organization_id": 1,
+            "team_id": 1,
+            "identity_id": 1
+          }
+        ]
+
+    volumes:
+      - agent-cache:/var/lib/dbpower-agent/cache
+
+    # Network configuration
+    networks:
+      - dbpower-network
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  agent-cache:
+    driver: local
+
+networks:
+  dbpower-network:
+    driver: bridge
