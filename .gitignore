@@ -10,3 +10,13 @@ venvai-analyzer/__pycache__/
 ai-analyzer/**/__pycache__/
 ai-analyzer/venv/
 ai-analyzer/.pytest_cache/
+.venv/
+venv/
+client-agent/venv/
+backend/tests/__pycache__
+backend/api/routes/__pycache__
+backend/services/ai/__pycache__
+client-agent/tests/__pycache__
+client-agent/anonymizer/__pycache__
+backend/api/__pycache__
+backend/middleware/__pycache__
