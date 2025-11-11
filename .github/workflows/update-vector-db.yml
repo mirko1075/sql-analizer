@@ -1,0 +1,41 @@
+name: Sync Docs to Supabase Vector DB
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**/*.md"
+      - "*.md"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://ezezqplwfugnpxfkeyev.supabase.co
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Debug URL and Keys
+        run: |
+          echo "SUPABASE_URL=$SUPABASE_URL"
+          echo "SUPABASE_KEY length=${#SUPABASE_KEY}"
+          echo "OPENAI_API_KEY length=${#OPENAI_API_KEY}"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install openai requests tiktoken python-dotenv
+
+      - name: Sync docs to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/sync_docs_to_supabase.py

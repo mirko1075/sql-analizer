@@ -1,113 +1,146 @@
-version: '3.8'
+version: '3.9'
 
 services:
-  # Internal PostgreSQL database for storing collected queries and analysis results
-  internal-db:
-    image: postgres:15
-    container_name: ai-analyzer-internal-db
+  # MySQL Lab Database - Il database da monitorare
+  mysql-lab:
+    image: mysql:8.0
+    container_name: dbpower-mysql-lab
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ai_core
-      POSTGRES_PASSWORD: ai_core
-      POSTGRES_DB: ai_core
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: labdb
+      MYSQL_USER: lab_user
+      MYSQL_PASSWORD: lab_pass
     ports:
-      - "5440:5432"
+      - "3307:3306"
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --slow_query_log=1
+      --long_query_time=0.5
+      --log_output=TABLE
+      --log_queries_not_using_indexes=ON
     volumes:
-      - ./backend/db/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql:ro
-      - ./data/internal-db:/var/lib/postgresql/data
+      - ./mysql-lab/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./data/mysql:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ai_core"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - dbpower-network
 
-  # Redis for caching and task queue (optional for APScheduler, required for Celery)
-  redis:
-    image: redis:7-alpine
-    container_name: ai-analyzer-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - ./data/redis:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
-  # FastAPI Backend
+  # Backend FastAPI - Collector + Analyzer
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: ai-analyzer-backend
+    container_name: dbpower-backend
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      # MySQL to monitor - from .env
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_PORT: ${MYSQL_PORT}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DB: ${MYSQL_DB}
+      
+      # DBPower monitoring user - from .env
+      DBPOWER_USER: ${DBPOWER_USER}
+      DBPOWER_PASSWORD: ${DBPOWER_PASSWORD}
+      
+      # AI Provider Selection - from .env
+      AI_PROVIDER: ${AI_PROVIDER:-llama}
+      AI_LOG_REQUESTS: ${AI_LOG_REQUESTS:-true}
+      AI_TIMEOUT: ${AI_TIMEOUT:-120.0}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-3}
+      
+      # LLaMA/Ollama Configuration - from .env
+      LLAMA_BASE_URL: ${LLAMA_BASE_URL:-http://ai-llama:11434}
+      LLAMA_MODEL: ${LLAMA_MODEL:-llama3.1:8b}
+      
+      # OpenAI Configuration - from .env (optional)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4-turbo-preview}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-2000}
+      
+      # Anthropic Configuration - from .env (optional)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-sonnet-20240229}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com/v1}
+      ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-2000}
+      
+      # Legacy AI Configuration (backward compatibility) - from .env
+      AI_BASE_URL: ${AI_BASE_URL:-http://ai-llama:11434}
+      AI_MODEL: ${AI_MODEL:-llama3.1:8b}
+      
+      # App settings - from .env
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      COLLECTION_INTERVAL: ${COLLECTION_INTERVAL:-60}
+      API_PORT: ${API_PORT:-8000}
+    depends_on:
+      mysql-lab:
+        condition: service_healthy
+      ai-llama:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - ./data/cache:/app/cache
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ollama with LLaMA - Local AI Model
+  ai-llama:
+    image: ollama/ollama:latest
+    container_name: dbpower-ai-llama
     restart: unless-stopped
     ports:
-      - "8000:8000"
-    environment:
-      # Internal DB connection
-      INTERNAL_DB_HOST: internal-db
-      INTERNAL_DB_PORT: 5432
-      INTERNAL_DB_USER: ai_core
-      INTERNAL_DB_PASSWORD: ai_core
-      INTERNAL_DB_NAME: ai_core
-
-      # Redis connection
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-
-      # Lab databases (external)
-      MYSQL_HOST: host.docker.internal
-      MYSQL_PORT: 3307
-      MYSQL_USER: root
-      MYSQL_PASSWORD: root
-      MYSQL_DB: labdb
-
-      PG_HOST: host.docker.internal
-      PG_PORT: 5433
-      PG_USER: postgres
-      PG_PASSWORD: root
-      PG_DB: labdb
-
-      # Application settings
-      LOG_LEVEL: INFO
-      ENV: development
-
-      # AI Provider Settings (optional)
-      # Set AI_PROVIDER to 'openai' to enable AI-powered analysis
-      # Leave as 'stub' for rule-based analysis only
-      AI_PROVIDER: stub
-      # AI_API_KEY: your-openai-api-key-here
-      AI_MODEL: gpt-4
-    depends_on:
-      internal-db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - "11434:11434"
     volumes:
-      - .:/app
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - ./data/ollama:/root/.ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    networks:
+      - dbpower-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # React Frontend
+  # Frontend React - Simple Dashboard
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: ai-analyzer-frontend
+    container_name: dbpower-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
-    environment:
-      VITE_API_URL: http://localhost:8000
+    network_mode: host
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
-  default:
-    name: ai-analyzer-network
+  dbpower-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
+  ollama-data:
+    driver: local
+  cache-data:
+    driver: local
