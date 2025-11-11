@@ -1,0 +1,198 @@
+version: '3.8'
+
+# Full stack DBPower deployment
+# Orchestrates all services: Backend, AI Analyzer, Client Agent, API Gateway
+
+services:
+  # Redis for API Gateway rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: dbpower-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - dbpower-network
+
+  # PostgreSQL database (for backend)
+  postgres:
+    image: postgres:15-alpine
+    container_name: dbpower-postgres
+    environment:
+      - POSTGRES_DB=dbpower
+      - POSTGRES_USER=dbpower
+      - POSTGRES_PASSWORD=dbpower_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbpower"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - dbpower-network
+
+  # Backend Service (Phase 1-2: Multi-tenant + Auth)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dbpower-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://dbpower:dbpower_password@postgres:5432/dbpower
+      - DB_TYPE=postgresql
+
+      # JWT
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+
+      # Server
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=INFO
+    ports:
+      - "8001:8000"  # Expose on 8001 to avoid conflict with gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - dbpower-network
+
+  # AI Analyzer Service (Phase 4: Cloud/On-Premise)
+  ai-analyzer:
+    build:
+      context: ./ai-analyzer
+      dockerfile: Dockerfile
+    container_name: dbpower-ai-analyzer
+    environment:
+      # Service
+      - ANALYZER_HOST=0.0.0.0
+      - ANALYZER_PORT=8001
+      - ANALYZER_WORKERS=2
+
+      # OpenAI (Cloud) - comment out for on-premise
+      - MODEL_PROVIDER=openai
+      - MODEL_NAME=gpt-4
+      - MODEL_API_KEY=${OPENAI_API_KEY}
+
+      # Ollama (On-Premise) - uncomment for on-premise
+      # - MODEL_PROVIDER=ollama
+      # - MODEL_NAME=codellama:13b
+      # - MODEL_API_BASE_URL=http://ollama:11434
+
+      # Security
+      - REQUIRE_AUTHENTICATION=false  # Gateway handles auth
+      - LOG_LEVEL=INFO
+    ports:
+      - "8002:8001"  # Expose on 8002
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - dbpower-network
+    profiles:
+      - cloud
+
+  # Ollama (for on-premise AI)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dbpower-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - dbpower-network
+    profiles:
+      - local
+
+  # API Gateway (Phase 5: Routing + Rate Limiting)
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: dbpower-api-gateway
+    depends_on:
+      - redis
+      - backend
+      - ai-analyzer
+    environment:
+      # Service
+      - GATEWAY_HOST=0.0.0.0
+      - GATEWAY_PORT=8000
+      - GATEWAY_WORKERS=4
+
+      # Backend services
+      - BACKEND_URL=http://backend:8000
+      - AI_ANALYZER_URL=http://ai-analyzer:8001
+
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_ENABLED=true
+
+      # Rate limiting
+      - RATE_LIMIT_RPM=100
+      - RATE_LIMIT_BURST=20
+      - RATE_LIMIT_PER_ORG=true
+      - RATE_LIMIT_PER_IP=true
+      - RATE_LIMIT_BLOCK_DURATION=60
+
+      # Authentication
+      - REQUIRE_AUTHENTICATION=true
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+      - JWT_ALGORITHM=HS256
+
+      # CORS
+      - CORS_ORIGINS=*
+
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_REQUESTS=true
+    ports:
+      - "8000:8000"  # Main entry point
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - dbpower-network
+
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  ollama-data:
+    driver: local
+
+networks:
+  dbpower-network:
+    driver: bridge
