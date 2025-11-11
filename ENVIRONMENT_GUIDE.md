@@ -466,3 +466,140 @@ npm run dev
 ---
 
 **Ready to test?** Continue to [TESTING_GUIDE.md](TESTING_GUIDE.md)
+
+---
+
+## Phase 1-6 Multi-Tenant Architecture
+
+DBPower AI Cloud has evolved from a single-service app to a complete multi-tenant platform. Here's what's new:
+
+### New Services (Phase 1-6)
+
+**Phase 1-2: Multi-Tenant Backend**
+- Port: 8000 (unchanged)
+- Now includes: JWT auth, RBAC, multi-tenant models, audit logging
+- Database: PostgreSQL with multi-tenant schema (organizations, teams, identities, users)
+
+**Phase 4: AI Analyzer Microservice**
+- Port: 8001
+- URL: http://localhost:8001
+- Purpose: Dedicated service for AI-powered query analysis
+- Providers: OpenAI (cloud), Ollama (on-premise), Stub (testing)
+- Health Check: `curl http://localhost:8001/health`
+
+**Phase 5: API Gateway**
+- Port: 8080
+- URL: http://localhost:8080
+- Purpose: Single entry point for all API requests
+- Features: Rate limiting, JWT authentication, request routing
+- All client requests go here first
+- Health Check: `curl http://localhost:8080/health`
+
+**Phase 6: Admin Panel**
+- Port: 3000
+- URL: http://localhost:3000
+- Purpose: Modern React admin interface
+- Technology: React 18 + TypeScript + Vite + Nginx
+- Features: Dashboard, org management, query analysis
+- Health Check: `curl http://localhost:3000/health`
+
+### Updated Service Flow
+
+```
+Client → Admin Panel (3000) → API Gateway (8080) → Backend (8000) → Database (5440)
+                                      ↓
+                               AI Analyzer (8001)
+                                      ↓
+                                  Redis (6379)
+```
+
+### Environment Variables for Phase 1-6
+
+Update your `.env` file with these new variables:
+
+```env
+# Multi-tenant authentication (Phase 1-2)
+JWT_SECRET_KEY=your-secret-key-change-in-production
+SUPER_ADMIN_EMAIL=admin@dbpower.local
+SUPER_ADMIN_PASSWORD=admin123
+CREATE_DEMO_ORG=true
+
+# API Gateway (Phase 5)
+RATE_LIMIT_REQUESTS_PER_MINUTE=100
+RATE_LIMIT_REQUESTS_PER_HOUR=1000
+
+# AI Analyzer (Phase 4)
+AI_PROVIDER=stub  # or openai, ollama
+AI_API_KEY=sk-your-openai-key  # if using OpenAI
+```
+
+### Verification for Phase 1-6
+
+Test all services are running:
+
+```bash
+# Admin Panel
+curl http://localhost:3000/health
+# Expected: "healthy"
+
+# API Gateway
+curl http://localhost:8080/health
+# Expected: {"status": "healthy", "service": "api-gateway"}
+
+# Backend
+curl http://localhost:8000/health
+# Expected: {"status": "healthy", "database": "connected", "redis": "connected"}
+
+# AI Analyzer
+curl http://localhost:8001/health
+# Expected: {"status": "healthy", "provider": "stub"}
+
+# Test authentication (get JWT token)
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@dbpower.local","password":"admin123"}'
+```
+
+### Service Dependencies
+
+1. **internal-db** (PostgreSQL) - Must start first
+2. **redis** - Must start second
+3. **backend** - Depends on internal-db and redis
+4. **ai-analyzer** - Independent, can start anytime
+5. **api-gateway** - Depends on backend, ai-analyzer, redis
+6. **admin-panel** - Depends on api-gateway
+
+Docker Compose handles these dependencies automatically via `depends_on` and health checks.
+
+### Troubleshooting Phase 1-6
+
+**Problem**: Admin panel shows "Connection refused"
+**Solution**: Check API Gateway is running: `docker-compose ps api-gateway`
+
+**Problem**: Login fails with "Invalid credentials"
+**Solution**: Check super admin was created: `docker-compose logs backend | grep "super admin"`
+
+**Problem**: Analysis button does nothing
+**Solution**: Check AI Analyzer: `curl http://localhost:8001/health`
+
+**Problem**: Rate limit errors
+**Solution**: Check Redis: `docker-compose ps redis` and `curl http://localhost:8080/rate-limit/info`
+
+### Port Summary
+
+Updated ports for all services:
+
+| Port | Service | Type |
+|------|---------|------|
+| 3000 | Admin Panel | Web UI |
+| 8080 | API Gateway | API Entry Point |
+| 8000 | Backend API | Core Logic |
+| 8001 | AI Analyzer | Microservice |
+| 5440 | PostgreSQL | Database |
+| 6379 | Redis | Cache |
+
+**Important**: Use port 8080 (API Gateway) for all external API requests, not 8000 (Backend).
+
+---
+
+**For complete bootstrap instructions, see [BOOTSTRAP_GUIDE.md](BOOTSTRAP_GUIDE.md)**
