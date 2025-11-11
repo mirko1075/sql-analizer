@@ -1,9 +1,31 @@
+# Environment
 .env
-backend/db/*.sql
-ai-query-lab/*
-data/*
-backend/db/*
-backend/__pycache__
-backend/core/__pycache__
-backend/services/__pycache__
-venv
+
+# Docker volumes
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv
+.Python
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# IDE
+.vscode/
+.idea/
+
+# SQLite
+*.db
+*.sqlite
+backend/cache/
+
+# Logs
+*.log
