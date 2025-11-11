@@ -94,26 +94,50 @@ class SQLAnonymizer:
         """
         result = sql
 
-        # First, mask sensitive patterns (before generic string/number masking)
-        result, stats = self._mask_sensitive_patterns(result, stats)
-
         # Mask all string literals (single and double quotes)
         # Match strings but avoid SQL keywords
         string_pattern = re.compile(r"'([^']*)'")
         matches = list(string_pattern.finditer(result))
         for match in reversed(matches):
+            content = match.group(1)
             # Skip if it's a SQL keyword or empty
-            if match.group(1) and not self._is_sql_keyword(match.group(1)):
-                result = result[:match.start()] + "'[STRING_REDACTED]'" + result[match.end():]
-                stats['strings'] += 1
+            if content and not self._is_sql_keyword(content):
+                # Check for sensitive patterns inside the string
+                masked_content, pattern_type = self._mask_string_content(content)
+                result = result[:match.start()] + f"'{masked_content}'" + result[match.end():]
+                if pattern_type == 'email':
+                    stats['emails'] += 1
+                elif pattern_type == 'credit_card':
+                    stats['credit_cards'] += 1
+                elif pattern_type == 'ip_address':
+                    stats['ip_addresses'] += 1
+                elif pattern_type == 'phone':
+                    stats['phones'] += 1
+                elif pattern_type == 'ssn':
+                    stats['ssns'] += 1
+                else:
+                    stats['strings'] += 1
 
         # Mask double-quoted strings
         double_quote_pattern = re.compile(r'"([^"]*)"')
         matches = list(double_quote_pattern.finditer(result))
         for match in reversed(matches):
-            if match.group(1) and not self._is_sql_keyword(match.group(1)):
-                result = result[:match.start()] + '"[STRING_REDACTED]"' + result[match.end():]
-                stats['strings'] += 1
+            content = match.group(1)
+            if content and not self._is_sql_keyword(content):
+                masked_content, pattern_type = self._mask_string_content(content)
+                result = result[:match.start()] + f'"{masked_content}"' + result[match.end():]
+                if pattern_type == 'email':
+                    stats['emails'] += 1
+                elif pattern_type == 'credit_card':
+                    stats['credit_cards'] += 1
+                elif pattern_type == 'ip_address':
+                    stats['ip_addresses'] += 1
+                elif pattern_type == 'phone':
+                    stats['phones'] += 1
+                elif pattern_type == 'ssn':
+                    stats['ssns'] += 1
+                else:
+                    stats['strings'] += 1
 
         # Mask numeric literals (but not in SQL keywords like LIMIT 10)
         # Only mask numbers in WHERE, SET, VALUES clauses
@@ -250,6 +274,31 @@ class SQLAnonymizer:
         count = len(pattern.findall(text))
         result = pattern.sub(replacement, text)
         return result, count
+
+    def _mask_string_content(self, content: str) -> Tuple[str, str]:
+        """
+        Mask string content based on pattern detection.
+
+        Args:
+            content: String content (without quotes)
+
+        Returns:
+            Tuple of (masked_content, pattern_type)
+            pattern_type is one of: email, credit_card, ip_address, phone, ssn, or 'generic'
+        """
+        # Check for specific patterns in order of priority
+        if self.patterns['email'].search(content):
+            return '[EMAIL_REDACTED]', 'email'
+        elif self.patterns['credit_card'].search(content):
+            return '[CREDIT_CARD_REDACTED]', 'credit_card'
+        elif self.patterns['ssn'].search(content):
+            return '[SSN_REDACTED]', 'ssn'
+        elif self.patterns['phone'].search(content):
+            return '[PHONE_REDACTED]', 'phone'
+        elif self.patterns['ip_address'].search(content):
+            return '[IP_REDACTED]', 'ip_address'
+        else:
+            return '[STRING_REDACTED]', 'generic'
 
     def _is_sql_keyword(self, text: str) -> bool:
         """
