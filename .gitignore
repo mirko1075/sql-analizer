@@ -6,4 +6,7 @@ backend/db/*
 backend/__pycache__
 backend/core/__pycache__
 backend/services/__pycache__
-venv
+venvai-analyzer/__pycache__/
+ai-analyzer/**/__pycache__/
+ai-analyzer/venv/
+ai-analyzer/.pytest_cache/
