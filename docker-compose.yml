@@ -91,7 +91,93 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # React Frontend
+  # AI Analyzer (OpenAI/Ollama microservice)
+  ai-analyzer:
+    build:
+      context: ./ai-analyzer
+      dockerfile: Dockerfile
+    container_name: ai-analyzer-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      # AI Provider: 'openai' or 'ollama'
+      AI_PROVIDER: stub
+      # AI_API_KEY: your-openai-api-key-here
+      AI_MODEL: gpt-4
+      # For Ollama (on-premise)
+      # OLLAMA_BASE_URL: http://ollama:11434
+      # OLLAMA_MODEL: llama2
+      LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway (rate limiting, auth, routing)
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: ai-analyzer-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    environment:
+      # Service configuration
+      SERVICE_NAME: dbpower-api-gateway
+      HOST: 0.0.0.0
+      PORT: 8000
+
+      # Backend services
+      BACKEND_URL: http://backend:8000
+      AI_ANALYZER_URL: http://ai-analyzer:8001
+
+      # Redis for rate limiting
+      REDIS_URL: redis://redis:6379/0
+
+      # JWT settings (must match backend)
+      JWT_SECRET_KEY: your-secret-key-change-in-production
+      JWT_ALGORITHM: HS256
+
+      # Rate limiting
+      RATE_LIMIT_REQUESTS_PER_MINUTE: 100
+      RATE_LIMIT_REQUESTS_PER_HOUR: 1000
+
+      LOG_LEVEL: INFO
+    depends_on:
+      backend:
+        condition: service_started
+      ai-analyzer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Admin Panel (React frontend)
+  admin-panel:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    container_name: ai-analyzer-admin-panel
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Frontend (legacy - can be removed if not used)
   frontend:
     build:
       context: ./frontend
@@ -107,6 +193,8 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    profiles:
+      - legacy
 
 networks:
   default:
