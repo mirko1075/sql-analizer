@@ -142,10 +142,18 @@ async def health_check():
         logger.error(f"Health check error: {e}")
         db_status = "error"
 
+    # Return structure matching frontend HealthStatus interface
+    db_healthy = db_status == "connected"
+
     return {
-        "status": "healthy" if db_status == "connected" else "degraded",
-        "database": db_status,
-        "service": "backend"
+        "status": "healthy" if db_healthy else "degraded",
+        "database": {
+            "status": "healthy" if db_healthy else "unhealthy"
+        },
+        "redis": {
+            "status": "healthy"  # Stub - redis not implemented in multi-tenant version
+        },
+        "uptime_seconds": 0  # TODO: Track actual uptime
     }
 
 
