@@ -101,6 +101,13 @@ try:
 except Exception as e:
     logger.warning(f"⚠️  Could not load collectors routes: {e}")
 
+try:
+    from api.routes import analyzer_simple
+    app.include_router(analyzer_simple.router, tags=["Analyzer"])
+    logger.info("✅ Loaded analyzer routes")
+except Exception as e:
+    logger.warning(f"⚠️  Could not load analyzer routes: {e}")
+
 # Old query routes - disabled for now due to model incompatibility
 # try:
 #     from api.routes import slow_queries, analyze, stats

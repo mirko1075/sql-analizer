@@ -125,3 +125,22 @@ async def get_unanalyzed_queries(
     """Get unanalyzed queries (stub - analysis not implemented yet)."""
     # For now, return empty list since analysis is not implemented
     return {"queries": []}
+
+
+@router.get("/trends")
+async def get_query_trends(
+    days: int = 7,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Get query trends over time (stub implementation).
+
+    Returns mock trend data since detailed analytics are not yet implemented.
+    """
+    # For now, return stub data indicating trends are not implemented
+    return {
+        "status": "not_implemented",
+        "message": f"Query trends for {days} days not yet implemented in multi-tenant version",
+        "trends": []
+    }
