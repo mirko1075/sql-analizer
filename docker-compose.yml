@@ -64,11 +64,12 @@ services:
       REDIS_PORT: 6379
 
       # Lab databases (external)
+      # Use host.docker.internal to access host's MySQL from container
       MYSQL_HOST: host.docker.internal
-      MYSQL_PORT: 3307
+      MYSQL_PORT: 3306
       MYSQL_USER: root
-      MYSQL_PASSWORD: root
-      MYSQL_DB: labdb
+      MYSQL_PASSWORD: admin
+      MYSQL_DB: ""  # Empty = monitor all databases
 
       PG_HOST: host.docker.internal
       PG_PORT: 5433
