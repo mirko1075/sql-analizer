@@ -8,9 +8,9 @@ import re
 import hashlib
 from typing import Tuple
 
-from backend.core.logger import get_logger
+from core.logger import setup_logger
 
-logger = get_logger(__name__)
+logger = setup_logger(__name__)
 
 
 def normalize_query(sql: str) -> str:

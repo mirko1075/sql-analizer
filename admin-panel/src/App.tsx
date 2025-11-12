@@ -8,7 +8,17 @@ import Layout from './components/Layout';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+
+  console.log('[PrivateRoute] Auth check:', { isAuthenticated, hasToken: !!token, hasUser: !!user });
+
+  if (!isAuthenticated) {
+    console.log('[PrivateRoute] Not authenticated, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function App() {

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Internal PostgreSQL database for storing collected queries and analysis results
   internal-db:
@@ -13,7 +11,6 @@ services:
     ports:
       - "5440:5432"
     volumes:
-      - ./backend/db/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql:ro
       - ./data/internal-db:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ai_core"]
@@ -47,7 +44,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Internal DB connection
+      # Internal DB connection (multi-tenant)
+      DB_TYPE: postgresql
+      DB_HOST: internal-db
+      DB_PORT: 5432
+      DB_USER: ai_core
+      DB_PASSWORD: ai_core
+      DB_NAME: ai_core
+
+      # Legacy naming (for backward compatibility)
       INTERNAL_DB_HOST: internal-db
       INTERNAL_DB_PORT: 5432
       INTERNAL_DB_USER: ai_core
@@ -75,6 +80,10 @@ services:
       LOG_LEVEL: INFO
       ENV: development
 
+      # JWT settings (must match api-gateway)
+      JWT_SECRET_KEY: your-secret-key-change-in-production
+      JWT_ALGORITHM: HS256
+
       # AI Provider Settings (optional)
       # Set AI_PROVIDER to 'openai' to enable AI-powered analysis
       # Leave as 'stub' for rule-based analysis only
@@ -87,7 +96,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - .:/app
+      - ./backend:/app
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -101,16 +110,15 @@ services:
     ports:
       - "8001:8001"
     environment:
-      # AI Provider: 'openai' or 'ollama'
-      AI_PROVIDER: stub
-      # AI_API_KEY: your-openai-api-key-here
-      AI_MODEL: gpt-4
-      # For Ollama (on-premise)
-      # OLLAMA_BASE_URL: http://ollama:11434
-      # OLLAMA_MODEL: llama2
+      # AI Model configuration
+      MODEL_PROVIDER: stub  # openai, ollama, or stub
+      MODEL_NAME: gpt-4
+      # MODEL_API_KEY: your-openai-api-key-here
+      # MODEL_API_BASE_URL: http://ollama:11434  # For Ollama on-premise
       LOG_LEVEL: INFO
+      REQUIRE_AUTHENTICATION: false  # Disable auth for internal service
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -123,7 +131,7 @@ services:
     container_name: ai-analyzer-gateway
     restart: unless-stopped
     ports:
-      - "8080:8000"
+      - "8082:8000"
     environment:
       # Service configuration
       SERVICE_NAME: dbpower-api-gateway
@@ -167,7 +175,7 @@ services:
     container_name: ai-analyzer-admin-panel
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3001:80"
     depends_on:
       api-gateway:
         condition: service_healthy

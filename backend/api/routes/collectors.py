@@ -6,12 +6,12 @@ API routes for manually triggering collection and checking scheduler status.
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import Dict, Any
 
-from backend.core.logger import get_logger
-from backend.services.mysql_collector import MySQLCollector
-from backend.services.postgres_collector import PostgreSQLCollector
-from backend.services.scheduler import get_scheduler
+from core.logger import setup_logger
+from services.mysql_collector import MySQLCollector
+from services.postgres_collector import PostgreSQLCollector
+from services.scheduler import get_scheduler
 
-logger = get_logger(__name__)
+logger = setup_logger(__name__)
 
 router = APIRouter(
     prefix="/collectors",

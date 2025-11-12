@@ -32,27 +32,35 @@ export interface Identity {
   created_at: string;
 }
 
+export interface AnalysisResult {
+  id: number;
+  slow_query_id: number;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  summary: string;
+  issues: string[];
+  recommendations: string[];
+  issues_found?: number;
+  optimization_priority?: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  overall_assessment?: string;
+  estimated_improvement?: string;
+  ai_model_used?: string;
+  created_at: string;
+}
+
 export interface SlowQuery {
   id: number;
   organization_id: number;
   team_id: number;
   identity_id: number;
-  sql_text: string;
+  sql_text?: string;
+  original_query?: string;
+  anonymized_query?: string;
   execution_time_ms: number;
-  rows_examined: number;
-  rows_returned: number;
+  database_type: 'mysql' | 'postgresql';
+  rows_examined?: number;
+  rows_returned?: number;
   created_at: string;
-}
-
-export interface AnalysisResult {
-  id: number;
-  slow_query_id: number;
-  issues_found: number;
-  optimization_priority: 'critical' | 'high' | 'medium' | 'low' | 'info';
-  overall_assessment: string;
-  estimated_improvement: string;
-  ai_model_used: string;
-  created_at: string;
+  analysis_result?: AnalysisResult;
 }
 
 export interface AuthState {

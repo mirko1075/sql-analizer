@@ -1,5 +1,5 @@
-"""
-API module for AI Query Analyzer.
+"""API package for backend routes."""
 
-Contains FastAPI routes, schemas, and endpoint definitions.
-"""
+from fastapi import APIRouter
+
+router = APIRouter()

@@ -3,16 +3,16 @@ Business logic and service layer.
 
 Contains collectors, analyzers, and other domain services.
 """
-from backend.services.mysql_collector import MySQLCollector
-from backend.services.postgres_collector import PostgreSQLCollector
-from backend.services.fingerprint import (
+from services.mysql_collector import MySQLCollector
+from services.postgres_collector import PostgreSQLCollector
+from services.fingerprint import (
     fingerprint_query,
     normalize_query,
     is_query_safe_to_explain,
     extract_tables_from_query,
 )
-from backend.services.analyzer import QueryAnalyzer
-from backend.services.ai_stub import AIAnalyzer, get_ai_analyzer
+from services.analyzer import QueryAnalyzer
+from services.ai_stub import AIAnalyzer, get_ai_analyzer
 
 __all__ = [
     "MySQLCollector",

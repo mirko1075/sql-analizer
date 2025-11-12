@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { AuthState, User } from '../types';
 
 interface AuthStore extends AuthState {
@@ -7,20 +8,31 @@ interface AuthStore extends AuthState {
   setUser: (user: User) => void;
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  token: localStorage.getItem('auth_token'),
-  isAuthenticated: !!localStorage.getItem('auth_token'),
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      isAuthenticated: false,
 
-  login: (token, user) => {
-    localStorage.setItem('auth_token', token);
-    set({ token, user, isAuthenticated: true });
-  },
+      login: (token, user) => {
+        console.log('[AuthStore] Login - saving token and user', { user });
+        set({ token, user, isAuthenticated: true });
+        // Also save to separate key for axios interceptor
+        localStorage.setItem('auth_token', token);
+        console.log('[AuthStore] State updated:', { isAuthenticated: true, hasUser: !!user });
+      },
 
-  logout: () => {
-    localStorage.removeItem('auth_token');
-    set({ token: null, user: null, isAuthenticated: false });
-  },
+      logout: () => {
+        set({ token: null, user: null, isAuthenticated: false });
+        localStorage.removeItem('auth_token');
+      },
 
-  setUser: (user) => set({ user }),
-}));
+      setUser: (user) => set({ user }),
+    }),
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => localStorage),
+    }
+  )
+);

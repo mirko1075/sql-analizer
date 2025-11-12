@@ -12,12 +12,26 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
+      console.log('[Login] Attempting login...');
       const { data } = await authAPI.login(email, password);
+      console.log('[Login] Login response:', { hasToken: !!data.access_token, user: data.user });
+
       login(data.access_token, data.user);
-      navigate('/');
+
+      // Verify token was saved
+      const savedToken = localStorage.getItem('auth_token');
+      console.log('[Login] Token saved in localStorage:', savedToken ? savedToken.substring(0, 20) + '...' : 'NOT SAVED');
+
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        console.log('[Login] Navigating to dashboard');
+        navigate('/', { replace: true });
+      }, 100);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      console.error('[Login] Login failed:', err);
+      setError(err.response?.data?.detail || err.response?.data?.message || 'Login failed');
     }
   };
 
