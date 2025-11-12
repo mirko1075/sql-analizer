@@ -6,10 +6,10 @@ API routes for triggering query analysis and managing the analyzer service.
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import Dict, Any
 
-from backend.core.logger import get_logger
-from backend.services.analyzer import QueryAnalyzer
+from core.logger import setup_logger
+from services.analyzer import QueryAnalyzer
 
-logger = get_logger(__name__)
+logger = setup_logger(__name__)
 
 router = APIRouter(
     prefix="/analyzer",
@@ -91,8 +91,8 @@ async def get_analyzer_status() -> Dict[str, Any]:
     Returns information about pending queries and analysis statistics.
     """
     try:
-        from backend.db.session import get_db_context
-        from backend.db.models import SlowQueryRaw, AnalysisResult
+        from db.session import get_db_context
+        from db.models import SlowQueryRaw, AnalysisResult
         from sqlalchemy import func
 
         with get_db_context() as db:

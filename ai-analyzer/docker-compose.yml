@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # AI Analyzer service (cloud model - OpenAI)
+  ai-analyzer-cloud:
+    build: .
+    image: dbpower-ai-analyzer:latest
+    container_name: dbpower-ai-analyzer-cloud
+    ports:
+      - "8001:8001"
+    environment:
+      # Service configuration
+      - ANALYZER_HOST=0.0.0.0
+      - ANALYZER_PORT=8001
+      - ANALYZER_WORKERS=2
+
+      # OpenAI Model configuration
+      - MODEL_PROVIDER=openai
+      - MODEL_NAME=gpt-4
+      - MODEL_API_KEY=${OPENAI_API_KEY}  # Set in .env file
+      - MODEL_TEMPERATURE=0.7
+      - MODEL_MAX_TOKENS=2000
+
+      # Analysis settings
+      - MAX_QUERY_LENGTH=10000
+      - ENABLE_CACHING=true
+      - CACHE_TTL=3600
+
+      # Security
+      - REQUIRE_AUTHENTICATION=true
+      - ALLOWED_API_KEYS=${ANALYZER_API_KEYS}  # Comma-separated
+
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_QUERIES=false  # Privacy: don't log SQL queries
+    restart: unless-stopped
+    profiles:
+      - cloud
+
+  # AI Analyzer service (on-premise - Ollama)
+  ai-analyzer-local:
+    build: .
+    image: dbpower-ai-analyzer:latest
+    container_name: dbpower-ai-analyzer-local
+    ports:
+      - "8001:8001"
+    environment:
+      # Service configuration
+      - ANALYZER_HOST=0.0.0.0
+      - ANALYZER_PORT=8001
+      - ANALYZER_WORKERS=1  # Local models are CPU-intensive
+
+      # Ollama Model configuration
+      - MODEL_PROVIDER=ollama
+      - MODEL_NAME=codellama:13b
+      - MODEL_API_BASE_URL=http://ollama:11434
+      - MODEL_TEMPERATURE=0.7
+      - MODEL_MAX_TOKENS=2000
+      - MODEL_TIMEOUT=120  # Local models may be slower
+
+      # Analysis settings
+      - MAX_QUERY_LENGTH=10000
+      - ENABLE_CACHING=true
+      - CACHE_TTL=3600
+
+      # Security
+      - REQUIRE_AUTHENTICATION=true
+      - ALLOWED_API_KEYS=${ANALYZER_API_KEYS}
+
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_QUERIES=false
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    profiles:
+      - local
+
+  # Ollama service (for on-premise deployment)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    profiles:
+      - local
+
+volumes:
+  ollama-data:
+    driver: local
+
+networks:
+  default:
+    name: dbpower-network

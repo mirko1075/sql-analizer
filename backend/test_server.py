@@ -21,16 +21,16 @@ print("=" * 60)
 # Test 1: Import modules
 print("\n[1/5] Testing module imports...")
 try:
-    from backend.core.config import settings
-    from backend.core.logger import get_logger
-    from backend.db.session import check_db_connection
-    from backend.main import app
+    from core.config import settings
+    from core.logger import setup_logger
+    from db.session import check_db_connection
+    from main import app
     print("✓ All modules imported successfully")
 except ImportError as e:
     print(f"✗ Import error: {e}")
     sys.exit(1)
 
-logger = get_logger(__name__)
+logger = setup_logger(__name__)
 
 # Test 2: Configuration
 print("\n[2/5] Checking configuration...")

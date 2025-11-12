@@ -9,13 +9,13 @@ from typing import Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from backend.core.config import settings
-from backend.core.logger import get_logger
-from backend.services.mysql_collector import MySQLCollector
-from backend.services.postgres_collector import PostgreSQLCollector
-from backend.services.analyzer import QueryAnalyzer
+from core.config import settings
+from core.logger import setup_logger
+from services.mysql_collector import MySQLCollector
+from services.postgres_collector import PostgreSQLCollector
+from services.analyzer import QueryAnalyzer
 
-logger = get_logger(__name__)
+logger = setup_logger(__name__)
 
 
 class CollectorScheduler:

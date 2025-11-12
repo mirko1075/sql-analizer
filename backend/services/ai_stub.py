@@ -6,10 +6,10 @@ for advanced query analysis and optimization suggestions.
 """
 import json
 from typing import Dict, Any, Optional
-from backend.core.config import settings
-from backend.core.logger import get_logger
+from core.config import settings
+from core.logger import setup_logger
 
-logger = get_logger(__name__)
+logger = setup_logger(__name__)
 
 
 class AIAnalyzer:

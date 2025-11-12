@@ -1,7 +1,7 @@
 """
 Pydantic schemas for request/response validation.
 """
-from backend.api.schemas.slow_query import (
+from api.schemas.slow_query import (
     SlowQuerySummary,
     SlowQueryDetail,
     SlowQueryWithAnalysis,
@@ -10,7 +10,7 @@ from backend.api.schemas.slow_query import (
     SuggestionSchema,
     ErrorResponse,
 )
-from backend.api.schemas.stats import (
+from api.schemas.stats import (
     TableImpactSchema,
     DatabaseStatsSchema,
     GlobalStatsResponse,

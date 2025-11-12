@@ -13,13 +13,13 @@ import psycopg2
 from psycopg2 import Error as PGError
 from psycopg2.extras import RealDictCursor
 
-from backend.core.config import settings
-from backend.core.logger import get_logger
-from backend.db.session import get_db_context
-from backend.db.models import SlowQueryRaw
-from backend.services.fingerprint import fingerprint_query, is_query_safe_to_explain
+from core.config import settings
+from core.logger import setup_logger
+from db.session import get_db_context
+from db.models import SlowQueryRaw
+from services.fingerprint import fingerprint_query, is_query_safe_to_explain
 
-logger = get_logger(__name__)
+logger = setup_logger(__name__)
 
 
 class PostgreSQLCollector:

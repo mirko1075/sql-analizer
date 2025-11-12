@@ -143,3 +143,19 @@ export interface PaginatedResponse<T> {
   page_size: number;
   total_pages: number;
 }
+
+// Authentication types
+export interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  organization_id: number;
+  identity_id: number;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+}
