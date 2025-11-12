@@ -185,7 +185,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # React Frontend (legacy - can be removed if not used)
+  # React Frontend (DBPower Base - LLaMA Edition with Auth)
   frontend:
     build:
       context: ./frontend
@@ -193,7 +193,7 @@ services:
     container_name: ai-analyzer-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "3000:80"
     environment:
       VITE_API_URL: http://localhost:8000
     depends_on:
@@ -201,8 +201,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    profiles:
-      - legacy
 
 networks:
   default:

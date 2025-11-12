@@ -87,6 +87,20 @@ try:
 except Exception as e:
     logger.warning(f"⚠️  Could not load stats routes: {e}")
 
+try:
+    from api.routes import queries
+    app.include_router(queries.router, tags=["Queries"])
+    logger.info("✅ Loaded queries routes")
+except Exception as e:
+    logger.warning(f"⚠️  Could not load queries routes: {e}")
+
+try:
+    from api.routes import collectors_simple
+    app.include_router(collectors_simple.router, tags=["Collectors"])
+    logger.info("✅ Loaded collectors routes")
+except Exception as e:
+    logger.warning(f"⚠️  Could not load collectors routes: {e}")
+
 # Old query routes - disabled for now due to model incompatibility
 # try:
 #     from api.routes import slow_queries, analyze, stats
