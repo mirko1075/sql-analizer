@@ -9,6 +9,7 @@ from datetime import datetime
 
 from db.models_multitenant import SlowQuery, User, UserRole, get_db
 from middleware.auth import get_current_user
+from utils.rule_analyzer import analyze_query_rules
 
 router = APIRouter(prefix="/api/v1/queries", tags=["Queries"])
 
@@ -91,6 +92,7 @@ async def get_query(
 ) -> Dict[str, Any]:
     """
     Get details of a specific slow query.
+    Includes automatic rule-based analysis with suggestions.
     """
     slow_query = db.query(SlowQuery).filter(SlowQuery.id == query_id).first()
 
@@ -110,6 +112,14 @@ async def get_query(
     else:
         severity = "LOW"
 
+    # Perform automatic rule-based analysis
+    analysis = analyze_query_rules(
+        sql=slow_query.sql_text,
+        query_time=slow_query.query_time,
+        rows_examined=slow_query.rows_examined or 0,
+        rows_sent=slow_query.rows_sent or 0
+    )
+
     return {
         "id": slow_query.id,
         "sql_fingerprint": slow_query.sql_fingerprint,
@@ -125,7 +135,22 @@ async def get_query(
         "severity": severity,
         "organization_id": slow_query.organization_id,
         "team_id": slow_query.team_id,
-        "identity_id": slow_query.identity_id
+        "identity_id": slow_query.identity_id,
+        # Add rule-based analysis
+        "analysis": {
+            "id": f"rule_based_{query_id}",
+            "slow_query_id": query_id,
+            "problem": analysis["problem"],
+            "root_cause": analysis["root_cause"],
+            "suggestions": analysis["suggestions"],
+            "improvement_level": analysis["improvement_level"],
+            "estimated_speedup": analysis["estimated_speedup"],
+            "analyzer_version": analysis["analyzer_version"],
+            "analysis_method": "rule_based",
+            "confidence_score": analysis["confidence_score"],
+            "analyzed_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.utcnow().isoformat()
+        }
     }
 
 
