@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from typing import Optional, Annotated
 from datetime import datetime
 
-from db.models_multitenant import User, Organization, get_db, UserRole
+from db.models_multitenant import User, Organization, Collector, get_db, UserRole
 from core.security import decode_token, verify_api_key, extract_org_id_from_api_key
+import re
 
 # Security scheme for JWT tokens
 security = HTTPBearer()
@@ -194,6 +195,78 @@ async def get_organization_from_api_key(
 
 
 # ============================================================================
+# COLLECTOR API KEY AUTHENTICATION
+# ============================================================================
+
+def extract_collector_id_from_api_key(api_key: str) -> Optional[int]:
+    """
+    Extract collector ID from API key.
+
+    Format: collector_{id}_{token}
+    Example: collector_5_abc123...
+    """
+    match = re.match(r'^collector_(\d+)_', api_key)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+async def get_collector_from_api_key(
+    x_collector_api_key: Annotated[Optional[str], Header()] = None,
+    db: Session = Depends(get_db)
+) -> Collector:
+    """
+    Validate collector API key and return collector.
+
+    Collector agents must send API key in X-Collector-API-Key header.
+
+    Usage in route:
+        @app.post("/api/v1/collectors/heartbeat")
+        async def heartbeat(
+            collector: Collector = Depends(get_collector_from_api_key)
+        ):
+            # collector.id, collector.organization_id, etc.
+            ...
+    """
+    if not x_collector_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-Collector-API-Key header"
+        )
+
+    # Extract collector ID from key format
+    collector_id = extract_collector_id_from_api_key(x_collector_api_key)
+    if not collector_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid collector API key format"
+        )
+
+    # Fetch collector
+    collector = db.query(Collector).filter(Collector.id == collector_id).first()
+    if not collector:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid collector API key"
+        )
+
+    # Verify API key
+    if not collector.api_key_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Collector has no API key configured"
+        )
+
+    if not collector.verify_api_key(x_collector_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid collector API key"
+        )
+
+    return collector
+
+
+# ============================================================================
 # ROLE-BASED ACCESS CONTROL
 # ============================================================================
 
@@ -323,6 +396,45 @@ def check_identity_access(user: User, identity_id: int, db: Session):
     # Regular user: only their own identity
     if user.identity_id != identity_id:
         raise AuthorizationError("Access denied to this identity")
+
+
+def check_collector_access(user: User, collector_id: int, db: Session):
+    """
+    Check if user has access to a collector.
+
+    Super admins: access to all collectors
+    Org admins: access to collectors in their organization
+    Team leads: access to collectors in their team
+    Users: no direct access to collectors
+
+    Raises:
+        AuthorizationError: If user doesn't have access
+    """
+    collector = db.query(Collector).filter(Collector.id == collector_id).first()
+    if not collector:
+        raise HTTPException(status_code=404, detail="Collector not found")
+
+    if user.role == UserRole.SUPER_ADMIN:
+        return  # Super admin has access to everything
+
+    if user.role == UserRole.ORG_ADMIN:
+        if collector.organization_id != user.organization_id:
+            raise AuthorizationError("Access denied to this collector")
+        return
+
+    if user.role == UserRole.TEAM_LEAD:
+        # Check if collector belongs to user's team
+        if not user.identity_id:
+            raise AuthorizationError("User not assigned to any team")
+
+        from db.models_multitenant import Identity
+        identity = db.query(Identity).filter(Identity.id == user.identity_id).first()
+        if identity and identity.team_id == collector.team_id:
+            return
+        raise AuthorizationError("Access denied to this collector")
+
+    # Regular users cannot manage collectors
+    raise AuthorizationError("Insufficient permissions to access collectors")
 
 
 # ============================================================================

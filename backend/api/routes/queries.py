@@ -1,17 +1,24 @@
 """
 Multi-tenant Queries API Routes for Phase 6.
 """
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from pydantic import BaseModel, Field
+import hashlib
 
-from db.models_multitenant import SlowQuery, User, UserRole, get_db
-from middleware.auth import get_current_user
+from db.models_multitenant import SlowQuery, User, UserRole, Collector, get_db
+from middleware.auth import get_current_user, get_collector_from_api_key
 from utils.rule_analyzer import analyze_query_rules
 
 router = APIRouter(prefix="/api/v1/queries", tags=["Queries"])
+
+
+class BulkQueryRequest(BaseModel):
+    """Request model for bulk query insertion."""
+    queries: List[Dict[str, Any]] = Field(..., description="List of query data dictionaries")
 
 
 @router.get("")
@@ -207,4 +214,77 @@ async def get_query_stats(
             {"database": db_name, "query_count": count}
             for db_name, count in databases
         ]
+    }
+
+
+@router.post("/bulk")
+async def create_queries_bulk(
+    request: BulkQueryRequest,
+    collector: Collector = Depends(get_collector_from_api_key),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Bulk insert slow queries from a collector agent.
+    Requires collector API key authentication.
+    """
+    created_count = 0
+    skipped_count = 0
+    errors = []
+
+    for query_data in request.queries:
+        try:
+            # Extract fields from query data
+            sql_text = query_data.get("sql_text", "")
+            if not sql_text:
+                skipped_count += 1
+                continue
+
+            # Generate SQL fingerprint (hash)
+            sql_fingerprint = hashlib.md5(sql_text.encode()).hexdigest()[:32]
+
+            # Parse start_time
+            start_time_str = query_data.get("start_time")
+            start_time = None
+            if start_time_str:
+                try:
+                    start_time = datetime.fromisoformat(start_time_str)
+                except:
+                    start_time = datetime.utcnow()
+
+            # Create SlowQuery object
+            slow_query = SlowQuery(
+                sql_fingerprint=sql_fingerprint,
+                sql_text=sql_text,
+                query_time=float(query_data.get("query_time", 0)),
+                lock_time=float(query_data.get("lock_time", 0)),
+                rows_sent=int(query_data.get("rows_sent", 0)),
+                rows_examined=int(query_data.get("rows_examined", 0)),
+                database_name=query_data.get("db") or query_data.get("database_name", "unknown"),
+                user_host=query_data.get("user_host", "unknown"),
+                start_time=start_time or datetime.utcnow(),
+                collected_at=datetime.utcnow(),
+                organization_id=collector.organization_id,
+                team_id=collector.team_id,
+                identity_id=None  # Collector doesn't have identity
+            )
+
+            db.add(slow_query)
+            created_count += 1
+
+        except Exception as e:
+            errors.append({"query": query_data.get("sql_text", "")[:50], "error": str(e)})
+            skipped_count += 1
+
+    # Commit all at once
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save queries: {str(e)}")
+
+    return {
+        "status": "success",
+        "count": created_count,
+        "skipped": skipped_count,
+        "errors": errors[:10]  # Limit errors to first 10
     }

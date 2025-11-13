@@ -237,4 +237,77 @@ export const analyzeSpecificQuery = async (queryId: string): Promise<void> => {
   await api.post(`/api/v1/analyzer/analyze/${queryId}`);
 };
 
+// ============================================================================
+// Collector Agents (new multi-tenant system)
+// ============================================================================
+
+export const listCollectorAgents = async (): Promise<{ collectors: any[], total: number }> => {
+  const response = await api.get('/api/v1/collectors');
+  return response.data;
+};
+
+export const getCollectorAgent = async (id: number): Promise<any> => {
+  const response = await api.get(`/api/v1/collectors/${id}`);
+  return response.data;
+};
+
+export const registerCollectorAgent = async (data: any): Promise<{ id: number; api_key: string; name: string; type: string }> => {
+  const response = await api.post('/api/v1/collectors/register', data);
+  return response.data;
+};
+
+export const updateCollectorAgent = async (id: number, data: any): Promise<any> => {
+  const response = await api.patch(`/api/v1/collectors/${id}`, data);
+  return response.data;
+};
+
+export const deleteCollectorAgent = async (id: number): Promise<void> => {
+  await api.delete(`/api/v1/collectors/${id}`);
+};
+
+export const startCollectorAgent = async (id: number): Promise<void> => {
+  await api.post(`/api/v1/collectors/${id}/start`);
+};
+
+export const stopCollectorAgent = async (id: number): Promise<void> => {
+  await api.post(`/api/v1/collectors/${id}/stop`);
+};
+
+export const triggerCollectorAgentCollection = async (id: number): Promise<void> => {
+  await api.post(`/api/v1/collectors/${id}/collect`);
+};
+
+export const getCollectorAgentCommands = async (id: number, limit: number = 50): Promise<any[]> => {
+  const response = await api.get(`/api/v1/collectors/${id}/commands`, { params: { limit } });
+  return response.data;
+};
+
+// ============================================================================
+// Organizations
+// ============================================================================
+
+export const listOrganizations = async (): Promise<any[]> => {
+  const response = await api.get('/api/v1/admin/organizations');
+  return response.data;
+};
+
+export const getOrganization = async (id: number): Promise<any> => {
+  const response = await api.get(`/api/v1/admin/organizations/${id}`);
+  return response.data;
+};
+
+export const createOrganization = async (data: any): Promise<any> => {
+  const response = await api.post('/api/v1/admin/organizations', data);
+  return response.data;
+};
+
+export const regenerateOrgApiKey = async (id: number): Promise<{ api_key: string }> => {
+  const response = await api.post(`/api/v1/admin/organizations/${id}/regenerate-api-key`);
+  return response.data;
+};
+
+export const deleteOrganization = async (id: number): Promise<void> => {
+  await api.delete(`/api/v1/admin/organizations/${id}`);
+};
+
 export default api;

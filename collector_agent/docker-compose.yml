@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # Example: MySQL Collector Agent
+  collector-mysql:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dbpower-collector-mysql
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/app/config/config.json:ro
+    environment:
+      - TZ=UTC
+    networks:
+      - dbpower-network
+    depends_on:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Example: PostgreSQL Collector Agent
+  collector-postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dbpower-collector-postgres
+    restart: unless-stopped
+    volumes:
+      - ./config-postgres.json:/app/config/config.json:ro
+    environment:
+      - TZ=UTC
+    networks:
+      - dbpower-network
+    depends_on:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  dbpower-network:
+    external: true
+    name: dbpower-ai-cloud_dbpower-network
+
+# Note: Backend service should be defined in the main docker-compose.yml
+# This file is for standalone collector agents that connect to the main backend

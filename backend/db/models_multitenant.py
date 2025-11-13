@@ -45,6 +45,21 @@ class PriorityLevel(str, enum.Enum):
     CRITICAL = "critical"
 
 
+class CollectorStatus(str, enum.Enum):
+    """Collector agent status."""
+    ONLINE = "online"          # Active and sending heartbeats
+    OFFLINE = "offline"        # No heartbeat received (timeout)
+    STOPPED = "stopped"        # Manually stopped
+    ERROR = "error"            # In error state
+    STARTING = "starting"      # Being initialized
+
+
+class CollectorType(str, enum.Enum):
+    """Types of database collectors."""
+    MYSQL = "mysql"
+    POSTGRES = "postgres"
+
+
 # ============================================================================
 # MULTI-TENANT HIERARCHY
 # ============================================================================
@@ -76,6 +91,7 @@ class Organization(Base):
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
     slow_queries = relationship("SlowQuery", back_populates="organization", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="organization", cascade="all, delete-orphan")
+    collectors = relationship("Collector", back_populates="organization", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Organization(id={self.id}, name='{self.name}')>"
@@ -115,6 +131,7 @@ class Team(Base):
     organization = relationship("Organization", back_populates="teams")
     identities = relationship("Identity", back_populates="team", cascade="all, delete-orphan")
     slow_queries = relationship("SlowQuery", back_populates="team", cascade="all, delete-orphan")
+    collectors = relationship("Collector", back_populates="team", cascade="all, delete-orphan")
 
     # Unique constraint: team name must be unique within organization
     __table_args__ = (
@@ -212,7 +229,7 @@ class SlowQuery(Base):
     # Multi-tenant fields
     organization_id = Column(Integer, ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False, index=True)
     team_id = Column(Integer, ForeignKey('teams.id', ondelete='CASCADE'), nullable=False, index=True)
-    identity_id = Column(Integer, ForeignKey('identities.id', ondelete='CASCADE'), nullable=False, index=True)
+    identity_id = Column(Integer, ForeignKey('identities.id', ondelete='CASCADE'), nullable=True, index=True)  # Nullable for collector-submitted queries
 
     # Query information (ANONYMIZED)
     sql_text = Column(Text, nullable=False)  # Anonymized SQL
@@ -341,6 +358,121 @@ class AuditLog(Base):
 
     def __repr__(self):
         return f"<AuditLog(id={self.id}, action='{self.action}', timestamp={self.timestamp})>"
+
+
+# ============================================================================
+# COLLECTOR AGENTS
+# ============================================================================
+
+class Collector(Base):
+    """
+    Collector agents that monitor external databases and send slow queries.
+    Each collector runs as a separate process/container and communicates via API.
+    """
+    __tablename__ = 'collectors'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Multi-tenant
+    organization_id = Column(Integer, ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False, index=True)
+    team_id = Column(Integer, ForeignKey('teams.id', ondelete='CASCADE'), nullable=False, index=True)
+
+    # Identification
+    name = Column(String(255), nullable=False)  # e.g., "MySQL Production Server"
+    type = Column(Enum(CollectorType), nullable=False, index=True)
+    status = Column(Enum(CollectorStatus), nullable=False, default=CollectorStatus.STARTING, index=True)
+
+    # Configuration (encrypted sensitive data)
+    config = Column(JSON, nullable=False)  # {host, port, user, password, databases, etc.}
+
+    # Authentication
+    api_key_hash = Column(String(128), nullable=False, index=True)
+
+    # Health & Status
+    last_heartbeat = Column(DateTime, nullable=True, index=True)
+    last_collection = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+
+    # Statistics
+    stats = Column(JSON, default={})  # {queries_collected, errors_count, uptime_seconds, etc.}
+
+    # Scheduling
+    collection_interval_minutes = Column(Integer, default=5, nullable=False)
+    auto_collect = Column(Boolean, default=True, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    organization = relationship("Organization", back_populates="collectors")
+    team = relationship("Team", back_populates="collectors")
+    commands = relationship("CollectorCommand", back_populates="collector", cascade="all, delete-orphan")
+
+    # Indexes
+    __table_args__ = (
+        UniqueConstraint('organization_id', 'name', name='uq_org_collector_name'),
+        Index('idx_org_status', 'organization_id', 'status'),
+        Index('idx_heartbeat', 'last_heartbeat'),
+    )
+
+    def __repr__(self):
+        return f"<Collector(id={self.id}, name='{self.name}', type={self.type.value}, status={self.status.value})>"
+
+    def generate_api_key(self) -> str:
+        """Generate a new API key for this collector."""
+        api_key = f"collector_{self.id}_{secrets.token_urlsafe(32)}"
+        self.api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        return api_key  # Return plain text key ONCE (store it!)
+
+    def verify_api_key(self, api_key: str) -> bool:
+        """Verify an API key against the stored hash."""
+        if not self.api_key_hash:
+            return False
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        return key_hash == self.api_key_hash
+
+    def is_online(self) -> bool:
+        """Check if collector is online (heartbeat within last 2 minutes)."""
+        if not self.last_heartbeat:
+            return False
+        return (datetime.utcnow() - self.last_heartbeat).total_seconds() < 120
+
+
+class CollectorCommand(Base):
+    """
+    Commands sent to collectors (start, stop, collect).
+    Collectors poll for commands during heartbeat.
+    """
+    __tablename__ = 'collector_commands'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    collector_id = Column(Integer, ForeignKey('collectors.id', ondelete='CASCADE'), nullable=False, index=True)
+
+    # Command
+    command = Column(String(50), nullable=False)  # start, stop, collect, update_config
+    params = Column(JSON, default={})  # Command parameters
+
+    # Status
+    executed = Column(Boolean, default=False, nullable=False, index=True)
+    executed_at = Column(DateTime, nullable=True)
+    result = Column(JSON, default={})  # Execution result
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False)  # Commands expire after 5 minutes
+
+    # Relationships
+    collector = relationship("Collector", back_populates="commands")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_collector_pending', 'collector_id', 'executed'),
+        Index('idx_expires', 'expires_at'),
+    )
+
+    def __repr__(self):
+        return f"<CollectorCommand(id={self.id}, command='{self.command}', executed={self.executed})>"
 
 
 # ============================================================================

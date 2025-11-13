@@ -159,3 +159,80 @@ export interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
 }
+
+// Collector Agent types (new multi-tenant system)
+export interface CollectorAgent {
+  id: number;
+  organization_id: number;
+  team_id: number;
+  name: string;
+  type: 'mysql' | 'postgres';
+  status: 'online' | 'offline' | 'stopped' | 'error' | 'starting';
+  config: {
+    host: string;
+    port: number;
+    user: string;
+    password?: string;
+    database?: string;
+    databases?: string[];
+    min_exec_time_ms?: number;
+  };
+  last_heartbeat?: string;
+  last_collection?: string;
+  last_error?: string;
+  stats: {
+    queries_collected?: number;
+    errors_count?: number;
+    uptime_seconds?: number;
+    last_error?: string;
+  };
+  collection_interval_minutes: number;
+  auto_collect: boolean;
+  is_online: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CollectorAgentCommand {
+  id: number;
+  command: 'start' | 'stop' | 'collect' | 'update_config';
+  params: Record<string, any>;
+  executed: boolean;
+  executed_at?: string;
+  result: Record<string, any>;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface CollectorAgentCreateRequest {
+  name: string;
+  type: 'mysql' | 'postgres';
+  team_id: number;
+  config: {
+    host: string;
+    port: number;
+    user: string;
+    password: string;
+    database?: string;
+    databases?: string[];
+    min_exec_time_ms?: number;
+  };
+  collection_interval_minutes: number;
+  auto_collect: boolean;
+}
+
+// Organization types
+export interface Organization {
+  id: number;
+  name: string;
+  settings: Record<string, any>;
+  api_key_created_at?: string;
+  api_key_expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationCreateRequest {
+  name: string;
+  settings?: Record<string, any>;
+}

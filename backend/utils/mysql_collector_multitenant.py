@@ -90,6 +90,7 @@ class MySQLCollectorMultiTenant:
             # MySQL slow_log structure: start_time, user_host, query_time, lock_time,
             # rows_sent, rows_examined, db, sql_text
             # Note: query_time is TIME type - we'll filter by time in Python to handle fractional seconds
+            # Exclude monitoring/test/metadata queries (only REAL application queries)
             query = """
                 SELECT
                     start_time,
@@ -103,6 +104,15 @@ class MySQLCollectorMultiTenant:
                 FROM mysql.slow_log
                 WHERE start_time >= %s
                   AND sql_text NOT LIKE CONCAT('%%%%', 'slow_log', '%%%%')
+                  AND sql_text NOT LIKE CONCAT('%%%%', 'SLEEP', '%%%%')
+                  AND sql_text NOT LIKE CONCAT('%%%%', 'test query', '%%%%')
+                  AND sql_text NOT LIKE CONCAT('%%%%', 'monitoring', '%%%%')
+                  AND sql_text NOT LIKE CONCAT('%%%%', 'INFORMATION_SCHEMA', '%%%%')
+                  AND sql_text NOT LIKE CONCAT('%%%%', 'information_schema', '%%%%')
+                  AND sql_text NOT LIKE CONCAT('%%%%', 'PERFORMANCE_SCHEMA', '%%%%')
+                  AND sql_text NOT LIKE CONCAT('%%%%', 'performance_schema', '%%%%')
+                  AND sql_text NOT LIKE 'SHOW%'
+                  AND sql_text NOT LIKE 'EXPLAIN%'
                 ORDER BY start_time DESC
                 LIMIT 1000
             """
@@ -201,6 +211,46 @@ class MySQLCollectorMultiTenant:
                 "error": str(e),
                 "queries_collected": 0
             }
+
+
+def get_mysql_databases() -> Dict[str, Any]:
+    """
+    Get list of available databases from MySQL server.
+    Excludes system databases.
+
+    Returns:
+        Dictionary with database list
+    """
+    try:
+        conn = mysql.connector.connect(**settings.get_mysql_dict())
+        cursor = conn.cursor()
+
+        # Get all databases
+        cursor.execute("SHOW DATABASES")
+        rows = cursor.fetchall()
+        all_databases = [str(row[0]) for row in rows]
+
+        # Exclude system databases
+        system_databases = {'mysql', 'information_schema', 'performance_schema', 'sys'}
+        user_databases = [db for db in all_databases if db not in system_databases]
+
+        cursor.close()
+        conn.close()
+
+        return {
+            "success": True,
+            "databases": user_databases,
+            "total_databases": len(user_databases),
+            "excluded_system_dbs": list(system_databases)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get MySQL databases: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "databases": []
+        }
 
 
 def test_mysql_connection() -> Dict[str, Any]:

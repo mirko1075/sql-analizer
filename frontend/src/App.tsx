@@ -3,7 +3,7 @@
  */
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Home, Database, Activity, BarChart3, LogOut, User } from 'lucide-react';
+import { Home, Database, Activity, BarChart3, Building, LogOut, User } from 'lucide-react';
 import { useAuthStore } from './store/authStore';
 import axios from 'axios';
 import Dashboard from './pages/Dashboard';
@@ -11,6 +11,7 @@ import SlowQueries from './pages/SlowQueries';
 import QueryDetail from './pages/QueryDetail';
 import Statistics from './pages/Statistics';
 import Collectors from './pages/Collectors';
+import Organizations from './pages/Organizations';
 import Login from './pages/Login';
 import './index.css';
 
@@ -95,6 +96,13 @@ function App() {
                         <Activity className="mr-2" size={18} />
                         Collectors
                       </Link>
+                      <Link
+                        to="/organizations"
+                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-md transition-colors"
+                      >
+                        <Building className="mr-2" size={18} />
+                        Organizations
+                      </Link>
                     </div>
                   </div>
 
@@ -160,6 +168,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <Collectors />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/organizations"
+              element={
+                <PrivateRoute>
+                  <Organizations />
                 </PrivateRoute>
               }
             />

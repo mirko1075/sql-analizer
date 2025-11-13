@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 from db.models_multitenant import User
 from middleware.auth import get_current_user
-from utils.mysql_collector_multitenant import MySQLCollectorMultiTenant, test_mysql_connection
+from utils.mysql_collector_multitenant import MySQLCollectorMultiTenant, test_mysql_connection, get_mysql_databases
 
 router = APIRouter(prefix="/api/v1/collectors", tags=["Collectors"])
 
@@ -83,6 +83,19 @@ async def test_mysql_collector(
     Returns connection status and MySQL server information.
     """
     return test_mysql_connection()
+
+
+@router.get("/mysql/databases")
+async def get_mysql_databases_list(
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get list of available databases from MySQL server.
+
+    Returns list of user databases (excludes system databases like mysql, information_schema).
+    Used for dynamic database filtering in the frontend.
+    """
+    return get_mysql_databases()
 
 
 @router.post("/postgres/collect")

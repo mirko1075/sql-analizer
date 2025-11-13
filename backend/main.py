@@ -36,6 +36,14 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("⚠️  Database connection failed")
 
+        # Start collector health monitor
+        try:
+            import services.collector_health_monitor as chm
+            await chm.start_health_monitor()
+            logger.info("✅ Collector health monitor started")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not start collector health monitor: {e}")
+
     except Exception as e:
         logger.error(f"❌ Error during startup: {e}", exc_info=True)
         logger.warning("⚠️  Starting with limited functionality")
@@ -46,6 +54,15 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("🛑 Shutting down DBPower AI Cloud...")
+
+    # Stop collector health monitor
+    try:
+        import services.collector_health_monitor as chm
+        await chm.stop_health_monitor()
+        logger.info("✅ Collector health monitor stopped")
+    except Exception as e:
+        logger.warning(f"⚠️  Could not stop collector health monitor: {e}")
+
     try:
         from db.session import close_db
         close_db()
@@ -100,6 +117,13 @@ try:
     logger.info("✅ Loaded collectors routes")
 except Exception as e:
     logger.warning(f"⚠️  Could not load collectors routes: {e}")
+
+try:
+    from api.routes import collector_agents
+    app.include_router(collector_agents.router, tags=["Collector Agents"])
+    logger.info("✅ Loaded collector agent routes")
+except Exception as e:
+    logger.warning(f"⚠️  Could not load collector agent routes: {e}")
 
 try:
     from api.routes import analyzer_simple

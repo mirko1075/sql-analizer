@@ -1,0 +1,15 @@
+{
+  "collector_id": 1,
+  "api_key": "collector_1_your-api-key-here",
+  "backend_url": "http://localhost:8000",
+  "db_type": "mysql",
+  "db_config": {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "password",
+    "databases": ["*"]
+  },
+  "heartbeat_interval": 30,
+  "collection_interval": 300
+}
