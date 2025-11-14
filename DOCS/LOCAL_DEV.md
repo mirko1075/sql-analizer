@@ -1,3 +1,43 @@
+# Local Development (no Docker)
+
+This document explains how to run the backend and supporting services locally without Docker. It focuses on a minimal, repeatable workflow for development and troubleshooting.
+
+Prerequisites
+- Python 3.12, python3-venv
+- PostgreSQL (initdb/pg_ctl) or Docker (fallback)
+- Redis (redis-server) or Docker (fallback)
+
+Quick start (automatic)
+1. Prepare the workspace and install dependencies:
+
+```bash
+./scripts/devctl.sh setup
+```
+
+2. Initialize lab DB (optional/heavy):
+
+```bash
+./scripts/devctl.sh lab-init --yes
+```
+
+3. Start the backend and scheduler locally:
+
+```bash
+./scripts/devctl.sh start-local
+```
+
+4. Stop local services:
+
+```bash
+./scripts/devctl.sh stop-local
+```
+
+Where to find logs
+- Backend: `run/logs/backend.log`
+- Scheduler: `run/logs/scheduler.log`
+- Lab DB init: `run/logs/lab-db-init.log`
+
+If a required system service is missing, the setup script will attempt Docker fallback. See TROUBLESHOOTING.md in `DOCS/` for common errors.
 # Local development quickstart
 
 This document explains how to bring up the full development stack locally and common troubleshooting steps.
