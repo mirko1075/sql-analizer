@@ -1,37 +1,7 @@
+"""Compatibility package for database helpers.
+
+This module provides a package path `backend.db` expected by the application
+and re-exports session helpers implemented in this package.
 """
-Database layer package.
 
-Contains SQLAlchemy models, session management, and database utilities.
-"""
-
-from backend.db.models import (
-    Base,
-    SlowQueryRaw,
-    AnalysisResult,
-    DbMetadata,
-    OptimizationHistory,
-    SchemaVersion,
-)
-from backend.db.session import (
-    get_db,
-    get_db_context,
-    check_db_connection,
-    init_db,
-    close_db_connections,
-)
-
-__all__ = [
-    # Models
-    "Base",
-    "SlowQueryRaw",
-    "AnalysisResult",
-    "DbMetadata",
-    "OptimizationHistory",
-    "SchemaVersion",
-    # Session
-    "get_db",
-    "get_db_context",
-    "check_db_connection",
-    "init_db",
-    "close_db_connections",
-]
+from .session import *  # noqa: F401,F403

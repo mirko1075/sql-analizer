@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Internal Database + Redis for AI Query Analyzer
 # This is separate from the lab database to keep things modular
 

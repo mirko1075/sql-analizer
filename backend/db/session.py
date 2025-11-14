@@ -1,204 +1,144 @@
-"""
-Database session management.
+"""Database session utilities for the backend package.
 
-Handles database connections, session lifecycle, and connection pooling
-for the internal AI Query Analyzer database (PostgreSQL).
+This is a minimal implementation used for local development and tests.
 """
-
 from contextlib import contextmanager
-from typing import Generator
+import logging
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import NullPool
+from sqlalchemy.orm import sessionmaker
 
 from backend.core.config import settings
-from backend.core.logger import get_logger
-from backend.db.models import Base
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-# Database engine (singleton)
-_engine = None
-_SessionLocal = None
+# Build a database URL for the internal DB
+DB_URL = (
+    f"postgresql://{settings.internal_db.user}:{settings.internal_db.password}@"
+    f"{settings.internal_db.host}:{settings.internal_db.port}/{settings.internal_db.database}"
+)
 
-
-def get_engine():
-    """
-    Get or create the SQLAlchemy engine.
-
-    Uses connection pooling for production efficiency.
-    """
-    global _engine
-
-    if _engine is None:
-        # Get database URL from settings
-        db_url = settings.internal_db.get_connection_string('postgresql')
-
-        logger.info(f"Creating database engine for: {settings.internal_db.host}:{settings.internal_db.port}")
-
-        # Create engine with connection pooling
-        _engine = create_engine(
-            db_url,
-            pool_pre_ping=True,  # Verify connections before using them
-            pool_size=10,  # Number of connections to maintain
-            max_overflow=20,  # Additional connections when pool is exhausted
-            pool_recycle=3600,  # Recycle connections after 1 hour
-            echo=False,  # Set to True for SQL query logging
-        )
-
-        logger.info("Database engine created successfully")
-
-    return _engine
-
-
-def get_session_factory():
-    """
-    Get or create the session factory.
-
-    Returns a sessionmaker that creates new database sessions.
-    """
-    global _SessionLocal
-
-    if _SessionLocal is None:
-        engine = get_engine()
-        _SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=engine
-        )
-        logger.info("Session factory created")
-
-    return _SessionLocal
-
-
-def get_db() -> Generator[Session, None, None]:
-    """
-    Dependency for FastAPI route handlers to get a database session.
-
-    Usage:
-        @app.get("/items")
-        def read_items(db: Session = Depends(get_db)):
-            return db.query(Item).all()
-
-    The session is automatically closed after the request.
-    """
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@contextmanager
-def get_db_context() -> Generator[Session, None, None]:
-    """
-    Context manager for database sessions outside of FastAPI.
-
-    Usage:
-        with get_db_context() as db:
-            items = db.query(Item).all()
-
-    The session is automatically committed and closed.
-    """
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        yield db
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+engine = create_engine(DB_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def check_db_connection() -> bool:
-    """
-    Check if the database is accessible.
-
-    Returns:
-        True if database is reachable, False otherwise
-    """
+    """Return True if the internal DB is reachable."""
     try:
-        engine = get_engine()
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        logger.info("Database connection check: SUCCESS")
         return True
     except Exception as e:
-        logger.error(f"Database connection check: FAILED - {e}")
+        logger.warning(f"Database connection check failed: {e}")
         return False
 
 
 def init_db() -> None:
-    """
-    Initialize the database schema.
+    """Create any required schema / migrations.
 
-    Creates all tables defined in the models if they don't exist.
-    This is safe to run multiple times (idempotent).
+    For local dev we rely on Alembic or SQL scripts; this is a no-op placeholder.
     """
+    logger.info("init_db called (no-op for local dev)")
+
+
+@contextmanager
+def get_db_context():
+    """Yield a SQLAlchemy Session context manager."""
+    db = SessionLocal()
     try:
-        engine = get_engine()
+        yield db
+    finally:
+        db.close()
 
-        logger.info("Initializing database schema...")
 
-        # Create all tables
-        Base.metadata.create_all(bind=engine)
+def get_db():
+    """Generator-style DB dependency for FastAPI routes.
 
-        logger.info("Database schema initialized successfully")
-
-        # Log created tables
-        inspector = engine.dialect.get_inspector(engine)
-        tables = inspector.get_table_names()
-        logger.info(f"Tables in database: {', '.join(tables)}")
-
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-        raise
+    Many modules import `get_db` from `backend.db.session` as a
+    dependency. Provide a simple generator that yields a Session and
+    ensures it's closed afterwards.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def close_db_connections() -> None:
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+"""Database session utilities for the backend package.
+
+This is a minimal implementation used for local development and tests.
+"""
+from contextlib import contextmanager
+import logging
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from backend.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Build a database URL for the internal DB
+DB_URL = (
+    f"postgresql://{settings.internal_db.user}:{settings.internal_db.password}@"
+    f"{settings.internal_db.host}:{settings.internal_db.port}/{settings.internal_db.database}"
+)
+
+engine = create_engine(DB_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def check_db_connection() -> bool:
+    """Return True if the internal DB is reachable."""
+    try:
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        return True
+    except Exception as e:
+        logger.warning(f"Database connection check failed: {e}")
+        return False
+
+
+def init_db() -> None:
+    """Create any required schema / migrations.
+
+    For local dev we rely on Alembic or SQL scripts; this is a no-op placeholder.
     """
-    Close all database connections and dispose of the engine.
+    logger.info("init_db called (no-op for local dev)")
 
-    Should be called during application shutdown.
+
+@contextmanager
+def get_db_context():
+    """Yield a SQLAlchemy Session context manager."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def get_db():
+    """Generator-style DB dependency for FastAPI routes.
+
+    Many modules import `get_db` from `backend.db.session` as a
+    dependency. Provide a simple generator that yields a Session and
+    ensures it's closed afterwards.
     """
-    global _engine, _SessionLocal
-
-    if _SessionLocal is not None:
-        logger.info("Closing database session factory")
-        _SessionLocal = None
-
-    if _engine is not None:
-        logger.info("Disposing database engine and closing connections")
-        _engine.dispose()
-        _engine = None
-
-    logger.info("All database connections closed")
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
-def reset_db() -> None:
-    """
-    Drop and recreate all tables.
-
-    WARNING: This will DELETE all data!
-    Only use in development/testing.
-    """
-    if settings.env == 'production':
-        raise RuntimeError("Cannot reset database in production environment!")
-
-    logger.warning("RESETTING DATABASE - ALL DATA WILL BE LOST!")
-
-    engine = get_engine()
-
-    # Drop all tables
-    Base.metadata.drop_all(bind=engine)
-    logger.info("All tables dropped")
-
-    # Recreate all tables
-    Base.metadata.create_all(bind=engine)
-    logger.info("All tables recreated")
-
-    logger.warning("Database reset complete")
+def close_db_connections() -> None:
+    try:
+        engine.dispose()
+    except Exception:
+        pass

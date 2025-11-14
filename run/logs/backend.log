@@ -1,0 +1,450 @@
+INFO:     Will watch for changes in these directories: ['/home/msiddi/Documents/personal/dbpower-ai-cloud/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [825664] using WatchFiles
+2025-11-14 20:45:51 | [32mINFO    [0m | root | Logging initialized at INFO level
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config | Configuration loaded:
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   Environment: development
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   Log Level: INFO
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   Internal DB: {'host': 'localhost', 'port': 5440, 'user': 'ai_core', 'database': 'ai_core'}
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   MySQL Lab: {'host': '127.0.0.1', 'port': 3307, 'user': 'root', 'database': 'labdb'}
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   PostgreSQL Lab: {'host': '127.0.0.1', 'port': 5433, 'user': 'postgres', 'database': 'labdb'}
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   Redis: localhost:6379
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   Collector Interval: 300s
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   Analyzer Interval: 600s
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.core.config |   AI Provider: stub
+INFO:     Started server process [825671]
+INFO:     Waiting for application startup.
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | AI Query Analyzer Backend Starting...
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | Environment: development
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | Version: 1.0.0
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | Checking database connection...
+2025-11-14 20:45:51 | [33mWARNING [0m | backend.db.session | Database connection check failed: Not an executable object: 'SELECT 1'
+2025-11-14 20:45:51 | [31mERROR   [0m | backend.main | ✗ Database connection failed
+2025-11-14 20:45:51 | [33mWARNING [0m | backend.main | Application starting with database issues
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | ✓ Application startup complete
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | Starting collector scheduler...
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | ============================================================
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | Starting Collector Scheduler
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | Collection interval: 5 minutes
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | ============================================================
+2025-11-14 20:45:51 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:45:51 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:45:51 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:45:51 | [32mINFO    [0m | apscheduler.scheduler | Added job "MySQL Slow Query Collector" to job store "default"
+2025-11-14 20:45:51 | [32mINFO    [0m | apscheduler.scheduler | Added job "PostgreSQL Slow Query Collector" to job store "default"
+2025-11-14 20:45:51 | [32mINFO    [0m | apscheduler.scheduler | Added job "Query Analyzer" to job store "default"
+2025-11-14 20:45:51 | [32mINFO    [0m | apscheduler.scheduler | Scheduler started
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | ✓ Scheduler started successfully
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler |   MySQL collector: every 5 minutes
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler |   PostgreSQL collector: every 5 minutes
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler |   Query analyzer: every 10 minutes
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | Running initial collection and analysis...
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | Starting MySQL slow query collection...
+2025-11-14 20:45:51 | [31mERROR   [0m | backend.services.mysql_collector | ✗ MySQL connection failed: 2003 (HY000): Can't connect to MySQL server on '127.0.0.1:3307' (111)
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | ✓ MySQL collection completed: 0 queries collected
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | Starting PostgreSQL slow query collection...
+2025-11-14 20:45:51 | [31mERROR   [0m | backend.services.postgres_collector | ✗ PostgreSQL connection failed: connection to server at "127.0.0.1", port 5433 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | ✓ PostgreSQL collection completed: 0 queries collected
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.services.scheduler | Starting pending query analysis...
+2025-11-14 20:45:51 | [31mERROR   [0m | backend.services.scheduler | ✗ Query analysis failed: (psycopg2.errors.UndefinedTable) relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+[SQL: SELECT slow_queries.id AS slow_queries_id, slow_queries.fingerprint AS slow_queries_fingerprint, slow_queries.source_db_type AS slow_queries_source_db_type, slow_queries.source_db_host AS slow_queries_source_db_host, slow_queries.duration_ms AS slow_queries_duration_ms, slow_queries.captured_at AS slow_queries_captured_at, slow_queries.status AS slow_queries_status 
+FROM slow_queries 
+WHERE slow_queries.status = %(status_1)s 
+ LIMIT %(param_1)s]
+[parameters: {'status_1': 'NEW', 'param_1': 50}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedTable: relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/backend/services/scheduler.py", line 68, in analyze_pending_queries
+    count = analyzer.analyze_all_pending(limit=50)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/backend/services/analyzer.py", line 444, in analyze_all_pending
+    ).limit(limit).all()
+                   ^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2693, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedTable) relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+[SQL: SELECT slow_queries.id AS slow_queries_id, slow_queries.fingerprint AS slow_queries_fingerprint, slow_queries.source_db_type AS slow_queries_source_db_type, slow_queries.source_db_host AS slow_queries_source_db_host, slow_queries.duration_ms AS slow_queries_duration_ms, slow_queries.captured_at AS slow_queries_captured_at, slow_queries.status AS slow_queries_status 
+FROM slow_queries 
+WHERE slow_queries.status = %(status_1)s 
+ LIMIT %(param_1)s]
+[parameters: {'status_1': 'NEW', 'param_1': 50}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-11-14 20:45:51 | [32mINFO    [0m | backend.main | ✓ Collector scheduler started
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'backend/db/session.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | AI Query Analyzer Backend Shutting Down...
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | Stopping collector scheduler...
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.services.scheduler | Stopping Collector Scheduler...
+2025-11-14 20:47:39 | [32mINFO    [0m | apscheduler.scheduler | Scheduler has been shut down
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.services.scheduler | ✓ Scheduler stopped
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ✓ Scheduler stopped
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ✓ Database connections closed
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ✓ Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [825671]
+2025-11-14 20:47:40 | [32mINFO    [0m | root | Logging initialized at INFO level
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config | Configuration loaded:
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Environment: development
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Log Level: INFO
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Internal DB: {'host': 'localhost', 'port': 5440, 'user': 'ai_core', 'database': 'ai_core'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   MySQL Lab: {'host': '127.0.0.1', 'port': 3307, 'user': 'root', 'database': 'labdb'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   PostgreSQL Lab: {'host': '127.0.0.1', 'port': 5433, 'user': 'postgres', 'database': 'labdb'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Redis: localhost:6379
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Collector Interval: 300s
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Analyzer Interval: 600s
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   AI Provider: stub
+WARNING:  WatchFiles detected changes in 'backend/db/models.py'. Reloading...
+2025-11-14 20:47:40 | [32mINFO    [0m | root | Logging initialized at INFO level
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config | Configuration loaded:
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Environment: development
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Log Level: INFO
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Internal DB: {'host': 'localhost', 'port': 5440, 'user': 'ai_core', 'database': 'ai_core'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   MySQL Lab: {'host': '127.0.0.1', 'port': 3307, 'user': 'root', 'database': 'labdb'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   PostgreSQL Lab: {'host': '127.0.0.1', 'port': 5433, 'user': 'postgres', 'database': 'labdb'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Redis: localhost:6379
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Collector Interval: 300s
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Analyzer Interval: 600s
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   AI Provider: stub
+INFO:     Started server process [826642]
+INFO:     Waiting for application startup.
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | AI Query Analyzer Backend Starting...
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Environment: development
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Version: 1.0.0
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Checking database connection...
+2025-11-14 20:47:40 | [33mWARNING [0m | backend.db.session | Database connection check failed: Not an executable object: 'SELECT 1'
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.main | ✗ Database connection failed
+2025-11-14 20:47:40 | [33mWARNING [0m | backend.main | Application starting with database issues
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ✓ Application startup complete
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Starting collector scheduler...
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting Collector Scheduler
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Collection interval: 5 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Added job "MySQL Slow Query Collector" to job store "default"
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Added job "PostgreSQL Slow Query Collector" to job store "default"
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Added job "Query Analyzer" to job store "default"
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Scheduler started
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ✓ Scheduler started successfully
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler |   MySQL collector: every 5 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler |   PostgreSQL collector: every 5 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler |   Query analyzer: every 10 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Running initial collection and analysis...
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting MySQL slow query collection...
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.services.mysql_collector | ✗ MySQL connection failed: 2003 (HY000): Can't connect to MySQL server on '127.0.0.1:3307' (111)
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ✓ MySQL collection completed: 0 queries collected
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting PostgreSQL slow query collection...
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.services.postgres_collector | ✗ PostgreSQL connection failed: connection to server at "127.0.0.1", port 5433 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ✓ PostgreSQL collection completed: 0 queries collected
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting pending query analysis...
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.services.scheduler | ✗ Query analysis failed: (psycopg2.errors.UndefinedTable) relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+[SQL: SELECT slow_queries.id AS slow_queries_id, slow_queries.fingerprint AS slow_queries_fingerprint, slow_queries.source_db_type AS slow_queries_source_db_type, slow_queries.source_db_host AS slow_queries_source_db_host, slow_queries.duration_ms AS slow_queries_duration_ms, slow_queries.captured_at AS slow_queries_captured_at, slow_queries.status AS slow_queries_status 
+FROM slow_queries 
+WHERE slow_queries.status = %(status_1)s 
+ LIMIT %(param_1)s]
+[parameters: {'status_1': 'NEW', 'param_1': 50}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedTable: relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/backend/services/scheduler.py", line 68, in analyze_pending_queries
+    count = analyzer.analyze_all_pending(limit=50)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/backend/services/analyzer.py", line 444, in analyze_all_pending
+    ).limit(limit).all()
+                   ^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2693, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedTable) relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+[SQL: SELECT slow_queries.id AS slow_queries_id, slow_queries.fingerprint AS slow_queries_fingerprint, slow_queries.source_db_type AS slow_queries_source_db_type, slow_queries.source_db_host AS slow_queries_source_db_host, slow_queries.duration_ms AS slow_queries_duration_ms, slow_queries.captured_at AS slow_queries_captured_at, slow_queries.status AS slow_queries_status 
+FROM slow_queries 
+WHERE slow_queries.status = %(status_1)s 
+ LIMIT %(param_1)s]
+[parameters: {'status_1': 'NEW', 'param_1': 50}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ✓ Collector scheduler started
+INFO:     Application startup complete.
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Running job "MySQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:52:40 CET)" (scheduled at 2025-11-14 20:52:40.686022+01:00)
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | Starting MySQL slow query collection...
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Running job "PostgreSQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:57:40 CET)" (scheduled at 2025-11-14 20:52:40.686154+01:00)
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | Starting PostgreSQL slow query collection...
+2025-11-14 20:52:40 | [31mERROR   [0m | backend.services.mysql_collector | ✗ MySQL connection failed: 2003 (HY000): Can't connect to MySQL server on '127.0.0.1:3307' (111)
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | ✓ MySQL collection completed: 0 queries collected
+2025-11-14 20:52:40 | [31mERROR   [0m | backend.services.postgres_collector | ✗ PostgreSQL connection failed: connection to server at "127.0.0.1", port 5433 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Job "MySQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:57:40 CET)" executed successfully
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | ✓ PostgreSQL collection completed: 0 queries collected
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Job "PostgreSQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:57:40 CET)" executed successfully
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      WARNING:  WatchFiles detected changes in 'backend/db/models.py', 'backend/db/session.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | AI Query Analyzer Backend Shutting Down...
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | Stopping collector scheduler...
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.services.scheduler | Stopping Collector Scheduler...
+2025-11-14 20:47:39 | [32mINFO    [0m | apscheduler.scheduler | Scheduler has been shut down
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.services.scheduler | ✓ Scheduler stopped
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ✓ Scheduler stopped
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ✓ Database connections closed
+2025-11-14 20:47:39 | [32mINFO    [0m | backend.main | ✓ Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [823798]
+2025-11-14 20:47:40 | [32mINFO    [0m | root | Logging initialized at INFO level
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config | Configuration loaded:
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Environment: development
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Log Level: INFO
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Internal DB: {'host': 'localhost', 'port': 5440, 'user': 'ai_core', 'database': 'ai_core'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   MySQL Lab: {'host': '127.0.0.1', 'port': 3307, 'user': 'root', 'database': 'labdb'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   PostgreSQL Lab: {'host': '127.0.0.1', 'port': 5433, 'user': 'postgres', 'database': 'labdb'}
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Redis: localhost:6379
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Collector Interval: 300s
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   Analyzer Interval: 600s
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.core.config |   AI Provider: stub
+INFO:     Started server process [826640]
+INFO:     Waiting for application startup.
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | AI Query Analyzer Backend Starting...
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Environment: development
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Version: 1.0.0
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Checking database connection...
+2025-11-14 20:47:40 | [33mWARNING [0m | backend.db.session | Database connection check failed: Not an executable object: 'SELECT 1'
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.main | ✗ Database connection failed
+2025-11-14 20:47:40 | [33mWARNING [0m | backend.main | Application starting with database issues
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ✓ Application startup complete
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | Starting collector scheduler...
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting Collector Scheduler
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Collection interval: 5 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ============================================================
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Added job "MySQL Slow Query Collector" to job store "default"
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Added job "PostgreSQL Slow Query Collector" to job store "default"
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Added job "Query Analyzer" to job store "default"
+2025-11-14 20:47:40 | [32mINFO    [0m | apscheduler.scheduler | Scheduler started
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ✓ Scheduler started successfully
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler |   MySQL collector: every 5 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler |   PostgreSQL collector: every 5 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler |   Query analyzer: every 10 minutes
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Running initial collection and analysis...
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting MySQL slow query collection...
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.services.mysql_collector | ✗ MySQL connection failed: 2003 (HY000): Can't connect to MySQL server on '127.0.0.1:3307' (111)
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ✓ MySQL collection completed: 0 queries collected
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting PostgreSQL slow query collection...
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.services.postgres_collector | ✗ PostgreSQL connection failed: connection to server at "127.0.0.1", port 5433 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | ✓ PostgreSQL collection completed: 0 queries collected
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.services.scheduler | Starting pending query analysis...
+2025-11-14 20:47:40 | [31mERROR   [0m | backend.services.scheduler | ✗ Query analysis failed: (psycopg2.errors.UndefinedTable) relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+[SQL: SELECT slow_queries.id AS slow_queries_id, slow_queries.fingerprint AS slow_queries_fingerprint, slow_queries.source_db_type AS slow_queries_source_db_type, slow_queries.source_db_host AS slow_queries_source_db_host, slow_queries.duration_ms AS slow_queries_duration_ms, slow_queries.captured_at AS slow_queries_captured_at, slow_queries.status AS slow_queries_status 
+FROM slow_queries 
+WHERE slow_queries.status = %(status_1)s 
+ LIMIT %(param_1)s]
+[parameters: {'status_1': 'NEW', 'param_1': 50}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedTable: relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/backend/services/scheduler.py", line 68, in analyze_pending_queries
+    count = analyzer.analyze_all_pending(limit=50)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/backend/services/analyzer.py", line 444, in analyze_all_pending
+    ).limit(limit).all()
+                   ^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2693, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/msiddi/Documents/personal/dbpower-ai-cloud/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedTable) relation "slow_queries" does not exist
+LINE 2: FROM slow_queries 
+             ^
+
+[SQL: SELECT slow_queries.id AS slow_queries_id, slow_queries.fingerprint AS slow_queries_fingerprint, slow_queries.source_db_type AS slow_queries_source_db_type, slow_queries.source_db_host AS slow_queries_source_db_host, slow_queries.duration_ms AS slow_queries_duration_ms, slow_queries.captured_at AS slow_queries_captured_at, slow_queries.status AS slow_queries_status 
+FROM slow_queries 
+WHERE slow_queries.status = %(status_1)s 
+ LIMIT %(param_1)s]
+[parameters: {'status_1': 'NEW', 'param_1': 50}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-11-14 20:47:40 | [32mINFO    [0m | backend.main | ✓ Collector scheduler started
+INFO:     Application startup complete.
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Running job "MySQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:52:40 CET)" (scheduled at 2025-11-14 20:52:40.394641+01:00)
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | Starting MySQL slow query collection...
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Running job "PostgreSQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:57:40 CET)" (scheduled at 2025-11-14 20:52:40.394798+01:00)
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | Starting PostgreSQL slow query collection...
+2025-11-14 20:52:40 | [31mERROR   [0m | backend.services.mysql_collector | ✗ MySQL connection failed: 2003 (HY000): Can't connect to MySQL server on '127.0.0.1:3307' (111)
+2025-11-14 20:52:40 | [31mERROR   [0m | backend.services.postgres_collector | ✗ PostgreSQL connection failed: connection to server at "127.0.0.1", port 5433 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | ✓ MySQL collection completed: 0 queries collected
+2025-11-14 20:52:40 | [32mINFO    [0m | backend.services.scheduler | ✓ PostgreSQL collection completed: 0 queries collected
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Job "MySQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:57:40 CET)" executed successfully
+2025-11-14 20:52:40 | [32mINFO    [0m | apscheduler.executors.default | Job "PostgreSQL Slow Query Collector (trigger: interval[0:05:00], next run at: 2025-11-14 20:57:40 CET)" executed successfully
