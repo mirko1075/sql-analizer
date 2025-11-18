@@ -1,0 +1,59 @@
+services:
+  # =========================================================================
+  # MySQL Lab Database
+  # =========================================================================
+  # Purpose: Intentionally poorly optimized database for testing slow queries
+  # Features:
+  #   - E-commerce schema with 11 tables
+  #   - 100K users, 50K products, 500K orders, 2M+ order items
+  #   - Missing/wrong indexes for generating slow queries
+  #   - Slow query log enabled
+  # =========================================================================
+  mysql-lab:
+    image: mysql:8.0
+    container_name: mysql-lab-slowquery
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_lab
+      # Enable slow query log
+      MYSQL_SLOW_QUERY_LOG: 1
+      MYSQL_LONG_QUERY_TIME: 0.5
+    command: >
+      --slow_query_log=1
+      --long_query_time=0.5
+      --log_slow_admin_statements=1
+      --log_queries_not_using_indexes=1
+      --slow_query_log_file=/var/log/mysql/slow-query.log
+      --max_allowed_packet=256M
+      --innodb_buffer_pool_size=512M
+      --innodb_log_file_size=128M
+    volumes:
+      # Mount initialization scripts
+      - ./mysql/init-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./mysql/load-data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+      # Persist data
+      - mysql-lab-data:/var/lib/mysql
+      # Slow query log
+      - mysql-lab-logs:/var/log/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - lab-network
+
+volumes:
+  mysql-lab-data:
+    driver: local
+  mysql-lab-logs:
+    driver: local
+
+networks:
+  lab-network:
+    name: slowquery-lab-network
+    driver: bridge

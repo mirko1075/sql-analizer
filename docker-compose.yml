@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Internal PostgreSQL database for storing collected queries and analysis results
   internal-db:

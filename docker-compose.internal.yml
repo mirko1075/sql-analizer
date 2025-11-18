@@ -1,0 +1,53 @@
+# Internal Database + Redis for AI Query Analyzer
+# This is separate from the lab database to keep things modular
+
+services:
+  # Internal PostgreSQL database for storing collected queries and analysis results
+  internal-db:
+    image: postgres:15
+    container_name: ai-analyzer-internal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ai_core
+      POSTGRES_PASSWORD: ai_core
+      POSTGRES_DB: ai_core
+    ports:
+      - "5440:5432"
+    volumes:
+      - internal-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_core"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - analyzer-network
+
+  # Redis for caching and task queue
+  redis:
+    image: redis:7-alpine
+    container_name: ai-analyzer-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - analyzer-network
+
+volumes:
+  internal-db-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  analyzer-network:
+    name: ai-analyzer-network
+    driver: bridge

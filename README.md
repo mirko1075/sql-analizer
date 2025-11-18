@@ -1,3 +1,36 @@
+# dbpower-ai-cloud — quickstart
+
+This repository contains the AI Query Analyzer backend and tools. The README here is intentionally minimal — developer docs and troubleshooting are in `DOCS/`.
+
+Quick commands
+
+1) Setup and start local (tries system services, falls back to Docker):
+
+```bash
+./scripts/devctl.sh setup
+```
+
+2) Initialize lab DB (optional heavy SQL):
+
+```bash
+./scripts/devctl.sh lab-init --yes
+```
+
+3) Start or stop local processes:
+
+```bash
+./scripts/devctl.sh start-local
+./scripts/devctl.sh stop-local
+```
+
+4) Use Docker compose when preferred:
+
+```bash
+./scripts/devctl.sh docker-up
+./scripts/devctl.sh docker-down
+```
+
+More detailed developer instructions and troubleshooting are in `DOCS/LOCAL_DEV.md` and `DOCS/TROUBLESHOOTING.md`.
 # AI Query Analyzer
 
 Enterprise-grade slow query analysis platform that automatically collects, analyzes, and provides optimization recommendations for MySQL and PostgreSQL databases.
@@ -19,405 +52,144 @@ AI Query Analyzer is a comprehensive solution for identifying and optimizing slo
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         AI Query Analyzer                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌──────────────┐    ┌──────────────┐    ┌─────────────────┐   │
-│  │   Frontend   │───▶│   Backend    │───▶│  Internal DB    │   │
-│  │  React + TS  │    │   FastAPI    │    │  PostgreSQL 15  │   │
-│  │  (Port 3000) │    │  (Port 8000) │    │   (Port 5440)   │   │
-│  └──────────────┘    └──────┬───────┘    └─────────────────┘   │
-│                              │                                    │
-│                              │            ┌─────────────────┐   │
-│                              └───────────▶│     Redis       │   │
-│                                            │  Cache + Queue  │   │
-│                                            └─────────────────┘   │
-│                                                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Scheduler (APScheduler)                      │  │
-│  │  ┌─────────────────┐    ┌─────────────────────────┐     │  │
-│  │  │ MySQL Collector │    │ PostgreSQL Collector    │     │  │
-│  │  │  (Every 5 min)  │    │     (Every 5 min)       │     │  │
-│  │  └────────┬────────┘    └──────────┬──────────────┘     │  │
-│  │           │                         │                     │  │
-│  │           └──────────┬──────────────┘                     │  │
-│  │                      ▼                                     │  │
-│  │           ┌─────────────────────┐                         │  │
-│  │           │   Query Analyzer    │                         │  │
-│  │           │   (Every 10 min)    │                         │  │
-│  │           └─────────────────────┘                         │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-        ┌───────────────────────────────────────────┐
-        │         External Lab Databases             │
-        │  ┌──────────────┐    ┌─────────────────┐  │
-        │  │ MySQL Lab    │    │ PostgreSQL Lab  │  │
-        │  │ (Port 3307)  │    │   (Port 5433)   │  │
-        │  └──────────────┘    └─────────────────┘  │
-        └───────────────────────────────────────────┘
-```
+# dbpower-ai-cloud — developer quickstart
 
-## Quick Start
+This repository contains the AI Query Analyzer backend, frontend, lab databases and helper scripts.
 
-### Prerequisites
+This README is a concise developer quickstart. Full design and troubleshooting docs are in `DOCS/`.
 
-- Docker 20.10+
-- Docker Compose 2.0+
-- 4GB RAM minimum
-- 10GB disk space
+Quick start
 
-### Start in Development Mode
+1. Start the full local stack (backend + scheduler + frontend) without LabDB initialization:
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd sql-analizer
-
-# Make startup script executable
-chmod +x start.sh
-
-# Start all services (lab databases + application)
-./start.sh dev
+./scripts/devctl.sh start-all
 ```
 
-After ~30 seconds, access:
-- **Frontend**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:8000](http://localhost:8000)
-- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **MySQL Lab**: `localhost:3307` (user: root, password: root)
-- **PostgreSQL Lab**: `localhost:5433` (user: postgres, password: postgres)
-
-### Start in Production Mode
+1. Start the full stack and run LabDB init (heavy SQL). Use `--yes` to run non-interactively:
 
 ```bash
-# Copy and configure production environment
-cp .env.prod.example .env.prod
-nano .env.prod  # Edit with your production values
-
-# Start in production mode
-./start.sh prod
+./scripts/devctl.sh start-all-with-lab --yes
 ```
 
-Production access:
-- **Frontend**: [http://localhost:80](http://localhost:80)
-- **Backend API**: [http://localhost:8000](http://localhost:8000)
+Important commands (developer)
 
-### Other Commands
+- `./scripts/devctl.sh setup` — prepare venv, install backend deps, start Postgres/Redis (or Docker fallback)
+- `./scripts/devctl.sh start-local` — start backend + scheduler (no frontend)
+- `./scripts/devctl.sh start-all` — start backend + scheduler + frontend (no LabDB init)
+- `./scripts/devctl.sh start-all-with-lab [--yes]` — start services and run LabDB init (prompted unless `--yes`)
+- `./scripts/devctl.sh lab-init [--yes]` — run lab DB init scripts (recursive search; applies .sql via psql or docker exec)
+- `./scripts/devctl.sh stress-db` — run heavy queries from `tests/heavy-queries.sql` (use with caution)
+- `./scripts/devctl.sh stop-local` — stop local processes started by scripts
+- `./scripts/devctl.sh docker-up` / `docker-down` — start/stop docker compose stacks
+
+Logs and runtime artifacts
+
+- `run/logs/` — logs created by the scripts (backend.log, scheduler.log, frontend.log, lab-db-init.log, stress-db.log)
+- `run/*.pid` — pidfiles for started processes (backend.pid, scheduler.pid, frontend.pid, redis.pid)
+
+Lab DB initialization and stress tests
+
+- Lab DB initialization can execute heavy SQL to create schemas and load test data. This is intentionally separate to avoid accidental changes.
+- `scripts/run_lab_init.sh` searches the repository for candidate init scripts and `.sql` files and applies them using `psql` (or `docker exec local-postgres-dev` as a fallback).
+- `scripts/stress-db.sh` runs `tests/heavy-queries.sql` and logs to `run/logs/stress-db.log`.
+
+Frontend notes
+
+- The frontend dev server (Vite) is started by `scripts/start-frontend-local.sh` and logs to `run/logs/frontend.log`.
+- Vite default dev port is `5173`. The `devctl` commands perform a smoke-test at `http://localhost:5173` after starting the frontend.
+
+Health checks and smoke tests
+
+- `start-all` and `start-all-with-lab` wait for backend (port 8000) and frontend (port 5173) and run a small HTTP smoke-test against the frontend to verify it is serving.
+
+Cleaning up
+
+Stop local processes started by the scripts:
 
 ```bash
-# Start only lab databases
-./start.sh lab
-
-# Stop all services
-./start.sh stop
-
-# Clean up everything (removes data!)
-./start.sh clean
-
-# View logs
-./start.sh logs
+./scripts/devctl.sh stop-local
 ```
 
-## 📚 Documentation
-
-For comprehensive guides, see:
-
-- **[🚀 Environment Setup Guide](ENVIRONMENT_GUIDE.md)** - Complete environment setup and verification
-- **[🧪 Testing Guide](TESTING_GUIDE.md)** - How to run performance tests and interpret results
-- **[📖 Test Catalog](ai-query-lab/tests/README_TESTS.md)** - Complete catalog of all 38 test cases
-
-### Quick Links
-- Run all performance tests: `cd ai-query-lab/tests && ./run_tests.sh all`
-- Run MySQL tests only: `./run_tests.sh mysql`
-- Run specific category: `./run_tests.sh mysql SCAN`
-- Run single test: `./run_tests.sh mysql --single SCAN-001`
-
-## Installation
-
-### Manual Installation (Development)
-
-#### 1. Start Lab Databases
+Remove runtime artifacts (pidfiles and logs):
 
 ```bash
-cd ai-query-lab
-docker compose up -d
-cd ..
+rm -rf run/*.pid run/logs/*
 ```
 
-#### 2. Setup Backend
+Docker vs local
+
+- `devctl` prefers local system services when available, but will fall back to Docker containers `local-postgres-dev` and `local-redis-dev`.
+- For full production-like runs (lab databases included), use the docker-compose stacks:
 
 ```bash
-cd backend
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment variables
-export INTERNAL_DB_HOST=localhost
-export INTERNAL_DB_PORT=5440
-export INTERNAL_DB_USER=ai_core
-export INTERNAL_DB_PASSWORD=ai_core_pass
-export INTERNAL_DB_NAME=ai_core
-
-export REDIS_HOST=localhost
-export REDIS_PORT=6379
-
-export MYSQL_HOST=localhost
-export MYSQL_PORT=3307
-export MYSQL_USER=root
-export MYSQL_PASSWORD=root
-
-export PG_HOST=localhost
-export PG_PORT=5433
-export PG_USER=postgres
-export PG_PASSWORD=postgres
-
-# Run backend
-uvicorn backend.main:app --reload
+./scripts/devctl.sh docker-up
+./scripts/devctl.sh docker-down
 ```
 
-#### 3. Setup Frontend
+More docs
+
+- Developer / local setup: `DOCS/LOCAL_DEV.md`
+- Troubleshooting: `DOCS/TROUBLESHOOTING.md`
+- API docs: run the backend and open `http://localhost:8000/docs`
+
+Next improvements (optional)
+
+- Add stricter post-init schema checks (verify `slow_queries` and key tables) and fail fast
+- Limit `run_lab_init.sh` to a preferred directory (e.g. `lab-database/`) rather than the whole repo
+
+Try it
 
 ```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+./scripts/devctl.sh start-all
+# later, if you want the LabDB init:
+./scripts/devctl.sh lab-init --yes
 ```
 
-### Docker Installation (Recommended)
-
-Use the provided [start.sh](start.sh) script for automated Docker deployment.
-
-## Configuration
-
-### Environment Variables
-
-#### Backend Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `INTERNAL_DB_HOST` | Internal PostgreSQL host | `internal-db` |
-| `INTERNAL_DB_PORT` | Internal PostgreSQL port | `5432` |
-| `INTERNAL_DB_USER` | Internal database user | `ai_core` |
-| `INTERNAL_DB_PASSWORD` | Internal database password | `ai_core_pass` |
-| `INTERNAL_DB_NAME` | Internal database name | `ai_core` |
-| `REDIS_HOST` | Redis host | `redis` |
-| `REDIS_PORT` | Redis port | `6379` |
-| `REDIS_PASSWORD` | Redis password | (none) |
-| `MYSQL_HOST` | MySQL lab host | `localhost` |
-| `MYSQL_PORT` | MySQL lab port | `3307` |
-| `MYSQL_USER` | MySQL lab user | `root` |
-| `MYSQL_PASSWORD` | MySQL lab password | `root` |
-| `PG_HOST` | PostgreSQL lab host | `localhost` |
-| `PG_PORT` | PostgreSQL lab port | `5433` |
-| `PG_USER` | PostgreSQL lab user | `postgres` |
-| `PG_PASSWORD` | PostgreSQL lab password | `postgres` |
-| `LOG_LEVEL` | Logging level | `INFO` |
-| `ENV` | Environment | `development` |
-
-#### Frontend Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL | `http://localhost:8000` |
-
-### Collector Configuration
-
-Collectors can be configured via the API or [backend/services/scheduler.py](backend/services/scheduler.py):
+A couple of developer snippets
 
 ```python
-# Collection interval (minutes)
-scheduler.start(interval_minutes=5)
-
-# Minimum duration threshold (ms)
-collector.fetch_slow_queries(min_duration_ms=1000.0, limit=100)
+def _analyze_mysql_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
+    # Add your custom rule here
+    if your_condition:
+        return {
+            'problem': 'Your problem description',
+            'root_cause': 'Why it happens',
+            'suggestions': [
+                {
+                    'priority': 'HIGH',
+                    'action': 'What to do',
+                    'rationale': 'Why it helps'
+                }
+            ],
+            'improvement_level': 'HIGH',
+            'estimated_speedup': '10-50x',
+            'confidence_score': 0.85
+        }
 ```
-
-### Analyzer Configuration
-
-Analyzer thresholds in [backend/services/analyzer.py](backend/services/analyzer.py):
 
 ```python
-# Duration threshold for heuristic analysis
-DURATION_THRESHOLD_MS = 5000
+def _openai_analysis(self, sql, explain_plan, db_type, duration_ms):
+    import openai
 
-# Rows examined/returned ratio threshold
-ROW_RATIO_THRESHOLD = 100
+    client = openai.OpenAI(api_key=self.api_key)
+
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{
+            "role": "system",
+            "content": "You are a database performance expert..."
+        }, {
+            "role": "user",
+            "content": f"Analyze this query:\n{sql}\n\nEXPLAIN:\n{explain_plan}"
+        }]
+    )
+
+    return self._parse_ai_response(response.choices[0].message.content)
 ```
 
-## Database Schema
+---
 
-### Internal Database Tables
-
-1. **slow_query_raw** - Raw collected queries
-2. **slow_query_fingerprint** - Normalized query patterns
-3. **analysis_result** - Analysis results and suggestions
-4. **collector_run_history** - Collection execution logs
-5. **feedback_history** - User feedback for learning loop
-
-### Views
-
-- **v_slow_query_summary** - Aggregated query statistics
-- **v_improvement_opportunities** - Queries with optimization potential
-
-See [backend/db/init_schema.sql](backend/db/init_schema.sql) for complete schema.
-
-## API Documentation
-
-### Endpoints
-
-#### Slow Queries
-
-- `GET /api/v1/slow-queries` - List slow queries (paginated)
-- `GET /api/v1/slow-queries/{id}` - Get query details
-- `GET /api/v1/slow-queries/{id}/raw` - Get raw query instances
-- `GET /api/v1/slow-queries/{id}/analysis` - Get analysis results
-
-#### Statistics
-
-- `GET /api/v1/stats` - Get system statistics
-- `GET /api/v1/stats/by-database` - Database distribution
-- `GET /api/v1/stats/by-improvement` - Improvement distribution
-
-#### Collectors
-
-- `POST /api/v1/collectors/mysql/collect` - Trigger MySQL collection
-- `POST /api/v1/collectors/postgres/collect` - Trigger PostgreSQL collection
-- `GET /api/v1/collectors/status` - Get collector status
-- `POST /api/v1/collectors/start` - Start scheduler
-- `POST /api/v1/collectors/stop` - Stop scheduler
-
-#### Analyzer
-
-- `POST /api/v1/analyzer/analyze` - Trigger analysis
-- `POST /api/v1/analyzer/analyze/{id}` - Analyze specific query
-- `GET /api/v1/analyzer/status` - Get analyzer status
-
-#### Health
-
-- `GET /health` - Health check endpoint
-
-Full API documentation available at [http://localhost:8000/docs](http://localhost:8000/docs) when running.
-
-## Development
-
-### Project Structure
-
-```
-sql-analizer/
-├── ai-query-lab/              # Lab databases
-│   ├── docker-compose.yml
-│   ├── mysql/
-│   │   └── init_lab.sql       # MySQL test data
-│   └── postgres/
-│       └── init_lab.sql       # PostgreSQL test data
-├── backend/
-│   ├── api/
-│   │   └── routes/            # API endpoints
-│   ├── db/
-│   │   ├── init_schema.sql    # Database schema
-│   │   ├── models.py          # SQLAlchemy models
-│   │   └── repository.py     # Data access layer
-│   ├── services/
-│   │   ├── mysql_collector.py
-│   │   ├── postgres_collector.py
-│   │   ├── analyzer.py        # Rule-based analyzer
-│   │   ├── ai_stub.py         # AI integration stub
-│   │   ├── fingerprint.py     # Query normalization
-│   │   └── scheduler.py       # Background jobs
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── main.py                # FastAPI application
-├── frontend/
-│   ├── src/
-│   │   ├── pages/             # React pages
-│   │   ├── services/          # API client
-│   │   └── types/             # TypeScript types
-│   ├── Dockerfile
-│   ├── nginx.conf             # Production nginx config
-│   ├── package.json
-│   └── vite.config.ts
-├── docker-compose.yml         # Development compose
-├── docker-compose.prod.yml    # Production compose
-├── .env.prod.example          # Production env template
-├── start.sh                   # Startup script
-└── README.md
-```
-
-### Running Tests
-
-#### Performance Tests (38 Test Cases)
-
-Comprehensive test suite for SQL performance problems:
-
-```bash
-cd ai-query-lab/tests
-
-# Run all tests (MySQL + PostgreSQL)
-./run_tests.sh all
-
-# Run specific database
-./run_tests.sh mysql
-./run_tests.sh postgres
-
-# Run specific categories
-./run_tests.sh mysql SCAN INDEX JOIN
-
-# Run single test
-./run_tests.sh mysql --single SCAN-001
-```
-
-Test categories:
-- **SCAN**: Full table scans (5 tests)
-- **INDEX**: Missing indexes (5 tests)
-- **JOIN**: JOIN problems (5 tests)
-- **SUB**: Subquery issues (5 tests)
-- **AGG**: Aggregation problems (5 tests)
-- **FUNC**: Function on columns (5 tests)
-- **TYPE**: Type conversions (4 tests)
-- **OR**: OR conditions (4 tests)
-
-See [Testing Guide](TESTING_GUIDE.md) for details.
-
-#### Backend Unit Tests
-
-```bash
-cd backend
-source venv/bin/activate
-
-# Test collectors
-python test_collectors.py
-
-# Test analyzer
-python test_analyzer.py
-```
-
-#### Frontend Tests
-
-```bash
-cd frontend
-
-# Run unit tests
-npm test
-
-# Run with coverage
-npm test -- --coverage
-```
-
-### Adding New Analysis Rules
-
-Edit [backend/services/analyzer.py](backend/services/analyzer.py):
 
 ```python
 def _analyze_mysql_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:

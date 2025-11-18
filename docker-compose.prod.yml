@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Internal PostgreSQL database for storing collected queries and analysis results
   internal-db:
@@ -42,7 +40,7 @@ services:
       - ai-analyzer-network
 
   # FastAPI Backend
-  backend:
+  ai-analyzer-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -98,7 +96,7 @@ services:
     command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
 
   # React Frontend with Nginx
-  frontend:
+  ai-analyzer-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
